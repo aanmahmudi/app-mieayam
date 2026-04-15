@@ -85,7 +85,7 @@
 .title {
   margin: 0;
   font-size: clamp(22px, 5vw, 30px);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.02em;
   text-align: center;
 }
@@ -135,7 +135,7 @@
   color: var(--accent-2);
   text-decoration: none;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .card h2 {
@@ -181,7 +181,7 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.9);
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
 }
@@ -239,7 +239,7 @@
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 13px;
   color: var(--muted);
   transition: background 120ms ease, color 120ms ease, transform 120ms ease;
@@ -306,7 +306,7 @@
 }
 
 .menuName {
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.1;
   white-space: nowrap;
@@ -346,7 +346,7 @@
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   display: grid;
   place-items: center;
@@ -373,11 +373,11 @@
 .qtyNum {
   width: 22px;
   text-align: center;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .menuPrice {
-  font-weight: 800;
+  font-weight: 600;
   padding: 7px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -401,7 +401,7 @@
 }
 
 .cartTitle {
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -412,7 +412,7 @@
 }
 
 .cartTotal {
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .cartItems {
@@ -440,7 +440,7 @@
 }
 
 .cartName {
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -459,7 +459,7 @@
 }
 
 .cartSubtotal {
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -491,7 +491,7 @@
 }
 
 .checkoutTitle {
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -542,7 +542,7 @@
 }
 
 .modalTitle {
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -574,7 +574,7 @@
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.9);
-  font-weight: 900;
+  font-weight: 700;
   font-size: 13px;
   display: grid;
   place-items: center;
@@ -590,7 +590,7 @@
 
 .stepLabel {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -673,7 +673,7 @@
   background: rgba(255, 255, 255, 0.86);
   display: grid;
   place-items: center;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--muted);
 }
 
@@ -694,7 +694,7 @@
   border-radius: 14px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background 120ms ease;
 }
@@ -740,7 +740,7 @@
 }
 
 .receiptTitle {
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -765,7 +765,7 @@
 }
 
 .receiptItemName {
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -781,7 +781,7 @@
   grid-column: 2;
   grid-row: 1 / 3;
   justify-self: end;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -805,7 +805,7 @@
 
 .receiptStrong {
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--text);
 }
 
@@ -848,7 +848,7 @@
 }
 
 .historyOrderId {
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -866,7 +866,7 @@
   border-radius: 999px;
   border: 1px solid var(--border);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -893,7 +893,7 @@
 }
 
 .historyAmount {
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -912,6 +912,86 @@
 
 .historyActions .button {
   width: 100%;
+}
+
+.adminPanel {
+  margin-top: 10px;
+}
+
+.adminList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.adminCard {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 0 rgba(2, 6, 23, 0.04);
+}
+
+.adminTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adminLeft {
+  min-width: 0;
+}
+
+.adminTitle {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.adminMeta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminTotal {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.adminItems {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(2, 6, 23, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adminItem {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminItemMore {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.adminCard .button.primary {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .payWrap {
@@ -937,7 +1017,7 @@
 }
 
 .payValue {
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .payMethods {
@@ -952,7 +1032,7 @@
   border-radius: 14px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background 120ms ease;
 }
@@ -979,27 +1059,17 @@
   color: var(--muted);
 }
 
+.payHint.error {
+  color: #b91c1c;
+}
+
 .payBank {
   margin-top: 10px;
 }
 
-.payTopUp {
-  margin-top: 10px;
-}
-
-.payTopUpRow {
-  display: flex;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.payTopUpRow .input {
-  flex: 1;
-}
-
 .txTitle {
   margin-top: 12px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -1029,7 +1099,7 @@
 }
 
 .txType {
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1045,7 +1115,7 @@
 }
 
 .txAmount {
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 

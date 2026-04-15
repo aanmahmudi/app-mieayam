@@ -32,6 +32,7 @@ public class SecurityConfig {
 			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/api/auth/**").permitAll()
+				.requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
 				.requestMatchers("/uploads/**").permitAll()
 				.anyRequest().authenticated()
 			)

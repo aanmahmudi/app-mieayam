@@ -3,6 +3,7 @@ package com.app.mie.ayam.wallet;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,8 @@ import com.app.mie.ayam.user.AppUserRepository;
 
 @Service
 public class WalletService {
+
+	private static final int DUMMY_INITIAL_BALANCE = 50_000_000;
 
 	private final WalletAccountRepository accountRepository;
 	private final WalletTransactionRepository transactionRepository;
@@ -31,14 +34,29 @@ public class WalletService {
 
 	@Transactional
 	public WalletAccount getOrCreateAccount(String username) {
-		return accountRepository.findByUserUsername(username).orElseGet(() -> {
+		return accountRepository.findByUserUsername(username).map(existing -> {
+			if (existing.getBalance() == 0) {
+				existing.setBalance(DUMMY_INITIAL_BALANCE);
+				return accountRepository.save(existing);
+			}
+			return existing;
+		}).orElseGet(() -> {
 			AppUser user = userRepository.findByUsername(username).orElseThrow();
-			WalletAccount created = new WalletAccount(user, 0, Instant.now());
-			return accountRepository.save(created);
+			try {
+				WalletAccount created = new WalletAccount(user, DUMMY_INITIAL_BALANCE, Instant.now());
+				return accountRepository.save(created);
+			} catch (DataIntegrityViolationException ex) {
+				WalletAccount existing = accountRepository.findByUserUsername(username).orElseThrow(() -> ex);
+				if (existing.getBalance() == 0) {
+					existing.setBalance(DUMMY_INITIAL_BALANCE);
+					return accountRepository.save(existing);
+				}
+				return existing;
+			}
 		});
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public int getBalance(String username) {
 		return getOrCreateAccount(username).getBalance();
 	}
@@ -95,11 +113,10 @@ public class WalletService {
 		return transactionRepository.save(tx);
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<WalletTransaction> listTransactions(String username, int limit) {
 		WalletAccount account = getOrCreateAccount(username);
 		int safeLimit = Math.max(1, Math.min(50, limit));
 		return transactionRepository.findAllByAccountIdOrderByCreatedAtDesc(account.getId(), PageRequest.of(0, safeLimit));
 	}
 }
-

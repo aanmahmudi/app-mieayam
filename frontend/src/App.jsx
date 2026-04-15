@@ -22,15 +22,26 @@ async function apiFetch(path, { token, method, body } = {}) {
   if (!res.ok) {
     const text = await res.text()
     const contentType = res.headers.get('content-type') ?? ''
-    if (contentType.includes('application/json')) {
+    const status = res.status
+    if ((status === 401 || status === 403) && path === '/api/auth/login') {
+      throw new Error('Username/password salah')
+    }
+
+    let parsed = null
+    if (contentType.includes('application/json') && text) {
       try {
-        const parsed = JSON.parse(text)
-        throw new Error(parsed?.message || parsed?.error || `Request gagal (${res.status})`)
+        parsed = JSON.parse(text)
       } catch {
-        throw new Error(text || `Request gagal (${res.status})`)
+        parsed = null
       }
     }
-    throw new Error(text || `Request gagal (${res.status})`)
+
+    const messageFromServer = (parsed && (parsed.message || parsed.error)) || text
+    if (messageFromServer) throw new Error(messageFromServer)
+
+    if (status === 401) throw new Error('Sesi habis. Silakan login lagi.')
+    if (status === 403) throw new Error('Akses ditolak.')
+    throw new Error(`Request gagal (${status})`)
   }
 
   if (res.status === 204) return null
@@ -89,12 +100,14 @@ function App() {
   const [paying, setPaying] = useState(false)
   const [walletBalance, setWalletBalance] = useState(0)
   const [walletTxs, setWalletTxs] = useState([])
-  const [topUpAmount, setTopUpAmount] = useState('')
-  const [toppingUp, setToppingUp] = useState(false)
   const [sheetMode, setSheetMode] = useState('order')
   const [orderHistory, setOrderHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [errorHistory, setErrorHistory] = useState('')
+  const [adminPending, setAdminPending] = useState([])
+  const [loadingAdmin, setLoadingAdmin] = useState(false)
+  const [errorAdmin, setErrorAdmin] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const [authRoute, setAuthRoute] = useState(() => getAuthRouteFromLocation())
   const [registerUsername, setRegisterUsername] = useState('')
@@ -183,6 +196,10 @@ function App() {
       setLoginUsername('')
       setLoginPassword('')
       window.history.pushState(null, '', '/')
+      setOrderHistory([])
+      setErrorHistory('')
+      setAdminPending([])
+      setErrorAdmin('')
     } catch (err) {
       setLoginStatus(err.message)
     }
@@ -200,6 +217,16 @@ function App() {
     setCashPaid('')
     setPaying(false)
     setCartOpen(false)
+    setOrderHistory([])
+    setLoadingHistory(false)
+    setErrorHistory('')
+    setWalletBalance(0)
+    setWalletTxs([])
+    setAdminPending([])
+    setLoadingAdmin(false)
+    setErrorAdmin('')
+    setIsAdmin(false)
+    setSheetMode('order')
     window.history.pushState(null, '', '/login')
   }
 
@@ -221,7 +248,16 @@ function App() {
   const cartCount = useMemo(() => cartEntries.reduce((acc, e) => acc + e.quantity, 0), [cartEntries])
   const cartTotal = useMemo(() => cartEntries.reduce((acc, e) => acc + e.quantity * e.item.price, 0), [cartEntries])
   const pendingPayment = !!lastOrder && lastOrder.status === 'CREATED'
-  const sheetTitle = sheetMode === 'payment' ? 'Pembayaran' : sheetMode === 'receipt' ? 'Struk' : sheetMode === 'history' ? 'Riwayat' : 'Pesanan'
+  const sheetTitle =
+    sheetMode === 'admin'
+      ? 'Admin Kasir'
+      : sheetMode === 'payment'
+        ? 'Pembayaran'
+        : sheetMode === 'receipt'
+          ? 'Struk'
+          : sheetMode === 'history'
+            ? 'Riwayat'
+            : 'Pesanan'
   const stepIndex = sheetMode === 'order' ? 0 : sheetMode === 'payment' ? 1 : sheetMode === 'receipt' ? 2 : 0
 
   const loadHistory = useCallback(async () => {
@@ -238,6 +274,21 @@ function App() {
     }
   }, [token])
 
+  const loadAdminPending = useCallback(async () => {
+    if (!token) return
+    setLoadingAdmin(true)
+    setErrorAdmin('')
+    try {
+      const data = await apiFetch('/api/admin/orders/pending?limit=50', { token })
+      setAdminPending(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setErrorAdmin(err.message)
+      setAdminPending([])
+    } finally {
+      setLoadingAdmin(false)
+    }
+  }, [token])
+
   useEffect(() => {
     if (!token) return
     apiFetch('/api/wallet/me', { token })
@@ -246,8 +297,22 @@ function App() {
     apiFetch('/api/wallet/transactions?limit=10', { token })
       .then((d) => setWalletTxs(Array.isArray(d) ? d : []))
       .catch(() => {})
+    apiFetch('/api/auth/me', { token })
+      .then((d) => setIsAdmin(Array.isArray(d?.roles) && d.roles.includes('ROLE_ADMIN')))
+      .catch(() => setIsAdmin(false))
     loadHistory()
   }, [token, loadHistory])
+
+  useEffect(() => {
+    if (!token) {
+      setOrderHistory([])
+      setWalletTxs([])
+      setWalletBalance(0)
+      setAdminPending([])
+      setIsAdmin(false)
+      if (sheetMode === 'admin') setSheetMode('order')
+    }
+  }, [token, sheetMode])
 
   useEffect(() => {
     if (lastOrder?.status === 'PAID') setSheetMode('receipt')
@@ -281,7 +346,7 @@ function App() {
       setCashPaid('')
       setSheetMode('payment')
       setCartOpen(true)
-      setOrderStatus(`Pesanan dibuat (#${data?.id}). Silakan lakukan pembayaran.`)
+      setOrderStatus('Pesanan dibuat. Silakan lakukan pembayaran.')
     } catch (err) {
       setOrderStatus(err.message)
     } finally {
@@ -323,23 +388,16 @@ function App() {
     }
   }
 
-  async function topUp() {
-    if (!token || toppingUp) return
-    const amount = topUpAmount ? Number.parseInt(topUpAmount, 10) : 0
-    if (!amount) return
-    setToppingUp(true)
+  async function confirmCashAsAdmin(orderId) {
+    if (!token) return
     setOrderStatus('')
     try {
-      const data = await apiFetch('/api/wallet/topup', { token, method: 'POST', body: { amount } })
-      setWalletBalance(data?.balance ?? walletBalance)
-      setTopUpAmount('')
-      const txs = await apiFetch('/api/wallet/transactions?limit=10', { token })
-      setWalletTxs(Array.isArray(txs) ? txs : [])
-      setOrderStatus('Top up berhasil.')
+      await apiFetch(`/api/admin/orders/${orderId}/confirm-cash`, { token, method: 'POST', body: {} })
+      setOrderStatus(`Order #${orderId} berhasil dikonfirmasi cash.`)
+      loadAdminPending()
+      loadHistory()
     } catch (err) {
       setOrderStatus(err.message)
-    } finally {
-      setToppingUp(false)
     }
   }
 
@@ -432,6 +490,35 @@ function App() {
               <h1 className="title">{categories.find((c) => c.key === activeCategory)?.label ?? 'Menu'}</h1>
             </div>
             <div className="headerRight">
+              {isAdmin ? (
+                <button
+                  className="iconButton"
+                  type="button"
+                  onClick={() => {
+                    setSheetMode('admin')
+                    setCartOpen(true)
+                    loadAdminPending()
+                  }}
+                  disabled={loadingAdmin}
+                  aria-label="Admin Kasir"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M9.5 12.5l1.7 1.7 3.6-3.6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : null}
               <button
                 className="iconButton"
                 type="button"
@@ -543,7 +630,7 @@ function App() {
                 <div>
                   <div className="checkoutTitle">Pembayaran</div>
                   <div className="checkoutMeta">
-                    Order #{lastOrder?.id} • {rupiah.format(lastOrder?.total ?? 0)}
+                    Total • {rupiah.format(lastOrder?.total ?? 0)}
                   </div>
                 </div>
                 <button
@@ -563,7 +650,7 @@ function App() {
               <div className="checkoutBar">
                 <div>
                   <div className="checkoutTitle">Struk</div>
-                  <div className="checkoutMeta">Order #{lastOrder?.id}</div>
+                  <div className="checkoutMeta">Pembayaran selesai</div>
                 </div>
                 <button
                   className="button primary"
@@ -591,11 +678,6 @@ function App() {
                         <div className="modalMeta">
                           {cartCount} item • {rupiah.format(cartTotal)}
                         </div>
-                      ) : lastOrder?.id ? (
-                        <div className="modalMeta">
-                          Order #{lastOrder.id}
-                          {lastOrder.total ? ` • ${rupiah.format(lastOrder.total)}` : ''}
-                        </div>
                       ) : null}
                     </div>
                     <button className="iconButton" type="button" onClick={() => setCartOpen(false)} aria-label="Tutup">
@@ -611,7 +693,7 @@ function App() {
                     </button>
                   </div>
 
-                  {sheetMode !== 'history' ? (
+                  {sheetMode !== 'history' && sheetMode !== 'admin' ? (
                     <div className="stepper">
                       <div className={`step ${stepIndex >= 0 ? 'active' : ''}`}>
                         <div className={`stepDot ${stepIndex >= 0 ? 'active' : ''}`}>1</div>
@@ -631,6 +713,45 @@ function App() {
                   ) : null}
 
                   <div className="modalBody">
+                    {sheetMode === 'admin' ? (
+                      <div className="adminPanel">
+                        <div className="receiptHeader">
+                          <div className="receiptTitle">Konfirmasi Cash</div>
+                          <button className="button" type="button" onClick={loadAdminPending} disabled={loadingAdmin}>
+                            {loadingAdmin ? 'Memuat...' : 'Refresh'}
+                          </button>
+                        </div>
+                        {errorAdmin ? <div className="status error">{errorAdmin}</div> : null}
+                        {!loadingAdmin && !adminPending.length ? <div className="payHint">Tidak ada order pending.</div> : null}
+                        <div className="adminList">
+                          {adminPending.map((o) => (
+                            <div className="adminCard" key={o.id}>
+                              <div className="adminTop">
+                                <div className="adminLeft">
+                                  <div className="adminTitle">Order #{o.id}</div>
+                                  <div className="adminMeta">
+                                    {o.username} • {formatDateTime(o.createdAt)}
+                                  </div>
+                                </div>
+                                <div className="adminTotal">{rupiah.format(o.total)}</div>
+                              </div>
+                              <div className="adminItems">
+                                {(o.items ?? []).slice(0, 2).map((it) => (
+                                  <div className="adminItem" key={it.menuItemId}>
+                                    {it.quantity} x {it.name}
+                                  </div>
+                                ))}
+                                {(o.items ?? []).length > 2 ? <div className="adminItemMore">+{o.items.length - 2} item</div> : null}
+                              </div>
+                              <button className="button primary" type="button" onClick={() => confirmCashAsAdmin(o.id)}>
+                                Konfirmasi Cash
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
                     {sheetMode === 'order' ? (
                       cartCount ? (
                         <>
@@ -683,11 +804,15 @@ function App() {
                             <div className="payLabel">Total</div>
                             <div className="payValue">{rupiah.format(lastOrder?.total ?? 0)}</div>
                           </div>
+                          <div className="payHint">Status: Belum dibayar</div>
                           <div className="payMethods">
                             <button
                               type="button"
                               className={`payMethodBtn ${paymentMethod === 'CASH' ? 'active' : ''}`}
-                              onClick={() => setPaymentMethod('CASH')}
+                              onClick={() => {
+                                setPaymentMethod('CASH')
+                                setCashPaid('')
+                              }}
                               disabled={paying}
                             >
                               Cash
@@ -711,25 +836,15 @@ function App() {
                           </div>
                           {paymentMethod === 'CASH' ? (
                             <div className="payCash">
-                              <div className="label">Uang dibayar</div>
+                              <div className="label">Pembayaran</div>
                               <input
                                 className="input"
-                                inputMode="numeric"
-                                placeholder="contoh: 50000"
-                                value={cashPaid}
-                                onChange={(e) => setCashPaid(e.target.value.replace(/[^\d]/g, ''))}
-                                disabled={paying}
+                                placeholder="Pembayaran di kasir / cash"
+                                value="Pembayaran di kasir / cash"
+                                readOnly
+                                disabled
                               />
-                              {cashPaid && Number.parseInt(cashPaid, 10) < (lastOrder?.total ?? 0) ? (
-                                <div className="payHint">
-                                  Kurang: {rupiah.format((lastOrder?.total ?? 0) - Number.parseInt(cashPaid, 10))}
-                                </div>
-                              ) : (
-                                <div className="payHint">
-                                  Kembalian:{' '}
-                                  {rupiah.format(Math.max(0, (cashPaid ? Number.parseInt(cashPaid, 10) : 0) - (lastOrder?.total ?? 0)))}
-                                </div>
-                              )}
+                              <div className="payHint">Pembayaran dilakukan di kasir. Status akan lunas setelah dikonfirmasi.</div>
                             </div>
                           ) : paymentMethod === 'QRIS' ? (
                             <div className="payHint">Simulasi QRIS: klik Bayar untuk konfirmasi.</div>
@@ -738,22 +853,6 @@ function App() {
                               <div className="paySummary">
                                 <div className="payLabel">Saldo</div>
                                 <div className="payValue">{rupiah.format(walletBalance)}</div>
-                              </div>
-                              <div className="payTopUp">
-                                <div className="label">Top up</div>
-                                <div className="payTopUpRow">
-                                  <input
-                                    className="input"
-                                    inputMode="numeric"
-                                    placeholder="contoh: 50000"
-                                    value={topUpAmount}
-                                    onChange={(e) => setTopUpAmount(e.target.value.replace(/[^\d]/g, ''))}
-                                    disabled={toppingUp || paying}
-                                  />
-                                  <button className="button" type="button" onClick={topUp} disabled={toppingUp || paying}>
-                                    {toppingUp ? '...' : 'Top up'}
-                                  </button>
-                                </div>
                               </div>
                               <div className="txTitle">Mutasi (terakhir)</div>
                               <div className="txList">
@@ -776,15 +875,20 @@ function App() {
                           <button
                             className="button primary cartSubmit"
                             type="button"
-                            onClick={payOrder}
+                            onClick={() => {
+                              if (paymentMethod === 'CASH') {
+                                setOrderStatus('Pembayaran cash dilakukan di kasir. Status: belum dibayar.')
+                                setSheetMode('receipt')
+                                return
+                              }
+                              payOrder()
+                            }}
                             disabled={
                               paying ||
-                              (paymentMethod === 'CASH' &&
-                                (!cashPaid || Number.parseInt(cashPaid, 10) < (lastOrder?.total ?? 0))) ||
                               (paymentMethod === 'BANK' && walletBalance < (lastOrder?.total ?? 0))
                             }
                           >
-                            {paying ? 'Memproses...' : 'Bayar'}
+                            {paymentMethod === 'CASH' ? 'Lanjut ke Struk' : paying ? 'Memproses...' : 'Bayar'}
                           </button>
                         </div>
                       ) : (
@@ -796,7 +900,7 @@ function App() {
                       <div className="receipt">
                         <div className="receiptHeader">
                           <div className="receiptTitle">Struk Pembayaran</div>
-                          <div className="receiptMeta">Order #{lastOrder.id}</div>
+                          <div className="receiptMeta">{formatDateTime(lastOrder.createdAt)}</div>
                         </div>
                         <div className="receiptItems">
                           {(lastOrder.items ?? []).map((it) => (
@@ -818,6 +922,12 @@ function App() {
                             <div>Status</div>
                             <div className="receiptStrong">{lastOrder.status === 'PAID' ? 'Lunas' : 'Belum dibayar'}</div>
                           </div>
+                          {lastOrder.status !== 'PAID' && paymentMethod === 'CASH' ? (
+                            <div className="receiptTotalRow">
+                              <div>Metode</div>
+                              <div className="receiptStrong">CASH (kasir)</div>
+                            </div>
+                          ) : null}
                           {lastOrder.status === 'PAID' ? (
                             <>
                               <div className="receiptTotalRow">
@@ -860,11 +970,13 @@ function App() {
                         {errorHistory ? <div className="status error">{errorHistory}</div> : null}
                         {!loadingHistory && !orderHistory.length ? <div className="payHint">Belum ada riwayat pesanan.</div> : null}
                         <div className="historyList">
-                          {orderHistory.map((o) => (
+                          {orderHistory.map((o, index) => {
+                            const seq = orderHistory.length - index
+                            return (
                             <div className="historyCard" key={o.id}>
                               <div className="historyTop">
                                 <div className="historyTopLeft">
-                                  <div className="historyOrderId">Order #{o.id}</div>
+                                  <div className="historyOrderId">Pesanan #{seq}</div>
                                   <div className="historyWhen">{formatDateTime(o.createdAt)}</div>
                                 </div>
                                 <div className={`historyBadge ${o.status === 'PAID' ? 'paid' : 'pending'}`}>
@@ -890,7 +1002,8 @@ function App() {
                                 </button>
                               </div>
                             </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     ) : null}

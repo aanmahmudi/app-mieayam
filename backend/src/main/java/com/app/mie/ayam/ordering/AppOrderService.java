@@ -111,10 +111,7 @@ public class AppOrderService {
 		int amountPaid;
 		int changeAmount;
 		if (method == PaymentMethod.CASH) {
-			if (request.amountPaid() == null) {
-				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Uang dibayar wajib diisi untuk pembayaran cash.");
-			}
-			amountPaid = request.amountPaid();
+			amountPaid = request.amountPaid() == null ? total : request.amountPaid();
 			if (amountPaid < total) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Uang dibayar kurang.");
 			}
