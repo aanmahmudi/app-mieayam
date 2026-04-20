@@ -48,4 +48,12 @@ public class AppUser {
 	public String getRolesCsv() {
 		return rolesCsv;
 	}
+
+	public void setPasswordHash(String passwordHash) {
+		this.passwordHash = passwordHash;
+	}
+
+	public void setRolesCsv(String rolesCsv) {
+		this.rolesCsv = rolesCsv;
+	}
 }

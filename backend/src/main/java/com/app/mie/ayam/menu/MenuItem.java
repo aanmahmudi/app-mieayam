@@ -76,6 +76,10 @@ public class MenuItem {
 		this.imageUrl = imageUrl;
 	}
 
+	public void setName(String name) {
+		this.name = name;
+	}
+
 	public void setUnit(String unit) {
 		this.unit = unit;
 	}

@@ -24,7 +24,7 @@ public record OrderResponse(
 	}
 
 	public static OrderResponse from(AppOrder order, AppOrderPayment payment) {
-		OrderStatus status = payment == null ? OrderStatus.CREATED : OrderStatus.PAID;
+		OrderStatus status = payment != null && payment.isConfirmed() ? OrderStatus.PAID : OrderStatus.CREATED;
 		return new OrderResponse(
 			order.getId(),
 			order.getCreatedAt(),

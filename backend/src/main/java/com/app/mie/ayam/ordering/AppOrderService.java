@@ -101,8 +101,12 @@ public class AppOrderService {
 		Optional<AppOrder> maybeOrder = orderRepository.findByIdAndUserUsername(orderId, username);
 		AppOrder order = maybeOrder.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order tidak ditemukan."));
 
-		if (paymentRepository.findByOrderId(order.getId()).isPresent()) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dibayar.");
+		AppOrderPayment existingPayment = paymentRepository.findByOrderId(order.getId()).orElse(null);
+		if (existingPayment != null) {
+			if (existingPayment.isConfirmed()) {
+				throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dibayar.");
+			}
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Pembayaran sedang menunggu konfirmasi admin.");
 		}
 
 		int total = order.getTotal();
@@ -126,6 +130,9 @@ public class AppOrderService {
 		}
 
 		AppOrderPayment payment = new AppOrderPayment(order, method, Instant.now(), amountPaid, changeAmount);
+		if (method != PaymentMethod.CASH) {
+			payment.setConfirmed(false);
+		}
 		AppOrderPayment savedPayment = paymentRepository.save(payment);
 		return OrderResponse.from(order, savedPayment);
 	}

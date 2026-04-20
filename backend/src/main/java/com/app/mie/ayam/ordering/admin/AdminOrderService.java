@@ -1,6 +1,5 @@
 package com.app.mie.ayam.ordering.admin;
 
-import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.domain.PageRequest;
@@ -34,30 +33,36 @@ public class AdminOrderService {
 		int safeLimit = Math.max(1, Math.min(100, limit));
 		List<AppOrder> orders = orderRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, safeLimit));
 		return orders.stream()
-			.filter(order -> paymentRepository.findByOrderId(order.getId()).isEmpty())
-			.map(AdminPendingOrderResponse::from)
+			.map(order -> new java.util.AbstractMap.SimpleEntry<>(order, paymentRepository.findByOrderId(order.getId()).orElse(null)))
+			.filter(entry -> entry.getValue() != null)
+			.filter(entry -> !entry.getValue().isConfirmed())
+			.filter(entry -> entry.getValue().getMethod() != PaymentMethod.CASH)
+			.map(entry -> AdminPendingOrderResponse.from(entry.getKey(), entry.getValue()))
 			.toList();
 	}
 
 	@Transactional
-	public OrderResponse confirmCashPayment(Long orderId, ConfirmCashPaymentRequest request) {
+	public OrderResponse confirmPayment(Long orderId, ConfirmCashPaymentRequest request) {
 		AppOrder order = orderRepository.findById(orderId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order tidak ditemukan."));
 
-		if (paymentRepository.findByOrderId(order.getId()).isPresent()) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dibayar.");
+		AppOrderPayment payment = paymentRepository.findByOrderId(order.getId())
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order belum memiliki data pembayaran."));
+		if (payment.isConfirmed()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dikonfirmasi.");
 		}
 
 		int total = order.getTotal();
-		int amountPaid = request != null && request.amountPaid() != null ? request.amountPaid() : total;
+		int amountPaid = request != null && request.amountPaid() != null ? request.amountPaid() : payment.getAmountPaid();
 		if (amountPaid < total) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Uang dibayar kurang.");
 		}
 		int changeAmount = amountPaid - total;
 
-		AppOrderPayment payment = new AppOrderPayment(order, PaymentMethod.CASH, Instant.now(), amountPaid, changeAmount);
+		payment.setAmountPaid(amountPaid);
+		payment.setChangeAmount(changeAmount);
+		payment.setConfirmed(true);
 		AppOrderPayment saved = paymentRepository.save(payment);
 		return OrderResponse.from(order, saved);
 	}
 }
-

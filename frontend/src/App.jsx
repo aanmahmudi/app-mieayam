@@ -108,6 +108,12 @@ function App() {
   const [loadingAdmin, setLoadingAdmin] = useState(false)
   const [errorAdmin, setErrorAdmin] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminSection, setAdminSection] = useState('cash')
+  const [adminMenuItems, setAdminMenuItems] = useState([])
+  const [loadingAdminMenu, setLoadingAdminMenu] = useState(false)
+  const [errorAdminMenu, setErrorAdminMenu] = useState('')
+  const [menuDraft, setMenuDraft] = useState({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })
+  const [savingMenu, setSavingMenu] = useState(false)
 
   const [authRoute, setAuthRoute] = useState(() => getAuthRouteFromLocation())
   const [registerUsername, setRegisterUsername] = useState('')
@@ -289,6 +295,21 @@ function App() {
     }
   }, [token])
 
+  const loadAdminMenu = useCallback(async () => {
+    if (!token) return
+    setLoadingAdminMenu(true)
+    setErrorAdminMenu('')
+    try {
+      const data = await apiFetch('/api/menu', { token })
+      setAdminMenuItems(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setErrorAdminMenu(err.message)
+      setAdminMenuItems([])
+    } finally {
+      setLoadingAdminMenu(false)
+    }
+  }, [token])
+
   useEffect(() => {
     if (!token) return
     apiFetch('/api/wallet/me', { token })
@@ -374,7 +395,9 @@ function App() {
         .then((d) => setWalletTxs(Array.isArray(d) ? d : []))
         .catch(() => {})
       await loadHistory()
-      if (data?.changeAmount) {
+      if (data?.status !== 'PAID') {
+        setOrderStatus('Pembayaran dikirim. Menunggu konfirmasi admin.')
+      } else if (data?.changeAmount) {
         setOrderStatus(`Pembayaran berhasil. Kembalian: ${rupiah.format(data.changeAmount)}`)
       } else {
         setOrderStatus('Pembayaran berhasil.')
@@ -388,16 +411,71 @@ function App() {
     }
   }
 
-  async function confirmCashAsAdmin(orderId) {
+  async function confirmPaymentAsAdmin(orderId) {
     if (!token) return
     setOrderStatus('')
     try {
-      await apiFetch(`/api/admin/orders/${orderId}/confirm-cash`, { token, method: 'POST', body: {} })
-      setOrderStatus(`Order #${orderId} berhasil dikonfirmasi cash.`)
+      await apiFetch(`/api/admin/orders/${orderId}/confirm`, { token, method: 'POST', body: {} })
+      setOrderStatus(`Order #${orderId} berhasil dikonfirmasi.`)
       loadAdminPending()
       loadHistory()
     } catch (err) {
       setOrderStatus(err.message)
+    }
+  }
+
+  async function saveAdminMenuItem() {
+    if (!token || savingMenu) return
+    if (!menuDraft.name.trim()) {
+      setOrderStatus('Nama menu wajib diisi.')
+      return
+    }
+    const price = menuDraft.price === '' ? 0 : Number.parseInt(menuDraft.price, 10)
+    if (Number.isNaN(price) || price < 0) {
+      setOrderStatus('Harga tidak valid.')
+      return
+    }
+    setSavingMenu(true)
+    setOrderStatus('')
+    try {
+      const payload = {
+        name: menuDraft.name.trim(),
+        category: menuDraft.category,
+        unit: menuDraft.unit?.trim() || null,
+        price,
+        imageUrl: menuDraft.imageUrl?.trim() || null,
+      }
+      if (menuDraft.id) {
+        await apiFetch(`/api/admin/menu/${menuDraft.id}`, { token, method: 'PUT', body: payload })
+        setOrderStatus('Menu berhasil di-update.')
+      } else {
+        await apiFetch('/api/admin/menu', { token, method: 'POST', body: payload })
+        setOrderStatus('Menu berhasil ditambahkan.')
+      }
+      setMenuDraft({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })
+      loadAdminMenu()
+    } catch (err) {
+      setOrderStatus(err.message)
+    } finally {
+      setSavingMenu(false)
+    }
+  }
+
+  async function deleteAdminMenuItem(id) {
+    if (!token || savingMenu) return
+    setSavingMenu(true)
+    setOrderStatus('')
+    try {
+      await apiFetch(`/api/admin/menu/${id}`, { token, method: 'DELETE' })
+      setOrderStatus('Menu berhasil dihapus.')
+      if (menuDraft.id === id) {
+        setMenuDraft({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })
+      }
+      loadAdminMenu()
+    } catch (err) {
+      setOrderStatus(err.message)
+    } finally {
+      setSavingMenu(false)
     }
   }
 
@@ -496,6 +574,7 @@ function App() {
                   type="button"
                   onClick={() => {
                     setSheetMode('admin')
+                    setAdminSection('cash')
                     setCartOpen(true)
                     loadAdminPending()
                   }}
@@ -716,39 +795,178 @@ function App() {
                     {sheetMode === 'admin' ? (
                       <div className="adminPanel">
                         <div className="receiptHeader">
-                          <div className="receiptTitle">Konfirmasi Cash</div>
-                          <button className="button" type="button" onClick={loadAdminPending} disabled={loadingAdmin}>
-                            {loadingAdmin ? 'Memuat...' : 'Refresh'}
+                          <div className="receiptTitle">Admin</div>
+                          <button
+                            className="button"
+                            type="button"
+                            onClick={adminSection === 'menu' ? loadAdminMenu : loadAdminPending}
+                            disabled={loadingAdmin || loadingAdminMenu}
+                          >
+                            {loadingAdmin || loadingAdminMenu ? 'Memuat...' : 'Refresh'}
+                          </button>
+                        </div>
+                        <div className="adminTabs">
+                          <button
+                            type="button"
+                            className={`adminTabBtn ${adminSection === 'cash' ? 'active' : ''}`}
+                            onClick={() => {
+                              setAdminSection('cash')
+                              loadAdminPending()
+                            }}
+                            disabled={loadingAdmin || loadingAdminMenu}
+                          >
+                            Konfirmasi
+                          </button>
+                          <button
+                            type="button"
+                            className={`adminTabBtn ${adminSection === 'menu' ? 'active' : ''}`}
+                            onClick={() => {
+                              setAdminSection('menu')
+                              loadAdminMenu()
+                            }}
+                            disabled={loadingAdmin || loadingAdminMenu}
+                          >
+                            Menu
                           </button>
                         </div>
                         {errorAdmin ? <div className="status error">{errorAdmin}</div> : null}
-                        {!loadingAdmin && !adminPending.length ? <div className="payHint">Tidak ada order pending.</div> : null}
-                        <div className="adminList">
-                          {adminPending.map((o) => (
-                            <div className="adminCard" key={o.id}>
-                              <div className="adminTop">
-                                <div className="adminLeft">
-                                  <div className="adminTitle">Order #{o.id}</div>
-                                  <div className="adminMeta">
-                                    {o.username} • {formatDateTime(o.createdAt)}
+                        {adminSection === 'cash' ? (
+                          <>
+                            {!loadingAdmin && !adminPending.length ? <div className="payHint">Tidak ada order pending.</div> : null}
+                            <div className="adminList">
+                              {adminPending.map((o) => (
+                                <div className="adminCard" key={o.id}>
+                                  <div className="adminTop">
+                                    <div className="adminLeft">
+                                      <div className="adminTitle">Order #{o.id}</div>
+                                      <div className="adminMeta">
+                                        {o.username} • {o.paymentMethod} • {formatDateTime(o.createdAt)}
+                                      </div>
+                                    </div>
+                                    <div className="adminTotal">{rupiah.format(o.total)}</div>
                                   </div>
+                                  <div className="adminItems">
+                                    {(o.items ?? []).slice(0, 2).map((it) => (
+                                      <div className="adminItem" key={it.menuItemId}>
+                                        {it.quantity} x {it.name}
+                                      </div>
+                                    ))}
+                                    {(o.items ?? []).length > 2 ? <div className="adminItemMore">+{o.items.length - 2} item</div> : null}
+                                  </div>
+                                  <button className="button primary" type="button" onClick={() => confirmPaymentAsAdmin(o.id)}>
+                                    Konfirmasi Pembayaran
+                                  </button>
                                 </div>
-                                <div className="adminTotal">{rupiah.format(o.total)}</div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {errorAdminMenu ? <div className="status error">{errorAdminMenu}</div> : null}
+                            <div className="adminMenuForm">
+                              <div className="label">{menuDraft.id ? 'Edit Menu' : 'Tambah Menu'}</div>
+                              <input
+                                className="input"
+                                placeholder="Nama menu"
+                                value={menuDraft.name}
+                                onChange={(e) => setMenuDraft((p) => ({ ...p, name: e.target.value }))}
+                                disabled={savingMenu}
+                              />
+                              <div className="adminMenuGrid">
+                                <select
+                                  className="input"
+                                  value={menuDraft.category}
+                                  onChange={(e) => setMenuDraft((p) => ({ ...p, category: e.target.value }))}
+                                  disabled={savingMenu}
+                                >
+                                  <option value="MAKANAN">MAKANAN</option>
+                                  <option value="MINUMAN">MINUMAN</option>
+                                  <option value="EXTRA">EXTRA</option>
+                                </select>
+                                <input
+                                  className="input"
+                                  placeholder="Unit (opsional)"
+                                  value={menuDraft.unit}
+                                  onChange={(e) => setMenuDraft((p) => ({ ...p, unit: e.target.value }))}
+                                  disabled={savingMenu}
+                                />
                               </div>
-                              <div className="adminItems">
-                                {(o.items ?? []).slice(0, 2).map((it) => (
-                                  <div className="adminItem" key={it.menuItemId}>
-                                    {it.quantity} x {it.name}
+                              <div className="adminMenuGrid">
+                                <input
+                                  className="input"
+                                  inputMode="numeric"
+                                  placeholder="Harga"
+                                  value={menuDraft.price}
+                                  onChange={(e) => setMenuDraft((p) => ({ ...p, price: e.target.value.replace(/[^\d]/g, '') }))}
+                                  disabled={savingMenu}
+                                />
+                                <input
+                                  className="input"
+                                  placeholder="Image URL (opsional)"
+                                  value={menuDraft.imageUrl}
+                                  onChange={(e) => setMenuDraft((p) => ({ ...p, imageUrl: e.target.value }))}
+                                  disabled={savingMenu}
+                                />
+                              </div>
+                              <div className="adminMenuActions">
+                                <button className="button primary" type="button" onClick={saveAdminMenuItem} disabled={savingMenu}>
+                                  {savingMenu ? 'Menyimpan...' : menuDraft.id ? 'Update' : 'Tambah'}
+                                </button>
+                                {menuDraft.id ? (
+                                  <button
+                                    className="button"
+                                    type="button"
+                                    onClick={() => setMenuDraft({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })}
+                                    disabled={savingMenu}
+                                  >
+                                    Batal
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="adminMenuList">
+                              {loadingAdminMenu ? <div className="payHint">Memuat menu...</div> : null}
+                              {!loadingAdminMenu && !adminMenuItems.length ? <div className="payHint">Menu kosong.</div> : null}
+                              {adminMenuItems
+                                .slice()
+                                .sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
+                                .map((it) => (
+                                  <div className="adminMenuRow" key={it.id}>
+                                    <div className="adminMenuLeft">
+                                      <div className="adminMenuName">{it.name}</div>
+                                      <div className="adminMenuMeta">
+                                        {it.category}
+                                        {it.unit ? ` • ${it.unit}` : ''}
+                                      </div>
+                                    </div>
+                                    <div className="adminMenuRight">
+                                      <div className="adminMenuPrice">{rupiah.format(it.price)}</div>
+                                      <button
+                                        className="button"
+                                        type="button"
+                                        onClick={() =>
+                                          setMenuDraft({
+                                            id: it.id,
+                                            name: it.name ?? '',
+                                            category: it.category ?? 'MAKANAN',
+                                            unit: it.unit ?? '',
+                                            price: String(it.price ?? ''),
+                                            imageUrl: it.imageUrl ?? '',
+                                          })
+                                        }
+                                        disabled={savingMenu}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button className="button" type="button" onClick={() => deleteAdminMenuItem(it.id)} disabled={savingMenu}>
+                                        Hapus
+                                      </button>
+                                    </div>
                                   </div>
                                 ))}
-                                {(o.items ?? []).length > 2 ? <div className="adminItemMore">+{o.items.length - 2} item</div> : null}
-                              </div>
-                              <button className="button primary" type="button" onClick={() => confirmCashAsAdmin(o.id)}>
-                                Konfirmasi Cash
-                              </button>
                             </div>
-                          ))}
-                        </div>
+                          </>
+                        )}
                       </div>
                     ) : null}
 
@@ -844,16 +1062,17 @@ function App() {
                                 readOnly
                                 disabled
                               />
-                              <div className="payHint">Pembayaran dilakukan di kasir. Status akan lunas setelah dikonfirmasi.</div>
+                              <div className="payHint">Cash diproses langsung tanpa konfirmasi admin.</div>
                             </div>
                           ) : paymentMethod === 'QRIS' ? (
-                            <div className="payHint">Simulasi QRIS: klik Bayar untuk konfirmasi.</div>
+                            <div className="payHint">QRIS perlu konfirmasi admin setelah bayar.</div>
                           ) : (
                             <div className="payBank">
                               <div className="paySummary">
                                 <div className="payLabel">Saldo</div>
                                 <div className="payValue">{rupiah.format(walletBalance)}</div>
                               </div>
+                              <div className="payHint">Bank perlu konfirmasi admin setelah bayar.</div>
                               <div className="txTitle">Mutasi (terakhir)</div>
                               <div className="txList">
                                 {walletTxs.length ? (
@@ -875,20 +1094,13 @@ function App() {
                           <button
                             className="button primary cartSubmit"
                             type="button"
-                            onClick={() => {
-                              if (paymentMethod === 'CASH') {
-                                setOrderStatus('Pembayaran cash dilakukan di kasir. Status: belum dibayar.')
-                                setSheetMode('receipt')
-                                return
-                              }
-                              payOrder()
-                            }}
+                            onClick={payOrder}
                             disabled={
                               paying ||
                               (paymentMethod === 'BANK' && walletBalance < (lastOrder?.total ?? 0))
                             }
                           >
-                            {paymentMethod === 'CASH' ? 'Lanjut ke Struk' : paying ? 'Memproses...' : 'Bayar'}
+                            {paying ? 'Memproses...' : 'Bayar'}
                           </button>
                         </div>
                       ) : (
@@ -922,10 +1134,10 @@ function App() {
                             <div>Status</div>
                             <div className="receiptStrong">{lastOrder.status === 'PAID' ? 'Lunas' : 'Belum dibayar'}</div>
                           </div>
-                          {lastOrder.status !== 'PAID' && paymentMethod === 'CASH' ? (
+                          {lastOrder.status !== 'PAID' ? (
                             <div className="receiptTotalRow">
                               <div>Metode</div>
-                              <div className="receiptStrong">CASH (kasir)</div>
+                              <div className="receiptStrong">{lastOrder.paymentMethod ?? paymentMethod ?? '-'}</div>
                             </div>
                           ) : null}
                           {lastOrder.status === 'PAID' ? (

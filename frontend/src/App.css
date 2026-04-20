@@ -918,6 +918,121 @@
   margin-top: 10px;
 }
 
+.adminTabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.adminTabBtn {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.86);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.adminTabBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: rgba(2, 6, 23, 0.14);
+}
+
+.adminTabBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.adminTabBtn.active {
+  border-color: rgba(79, 70, 229, 0.35);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(79, 70, 229, 0.98) 100%);
+  color: #ffffff;
+}
+
+.adminMenuForm {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.adminMenuGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.adminMenuActions {
+  display: flex;
+  gap: 10px;
+}
+
+.adminMenuActions .button {
+  flex: 1;
+}
+
+.adminMenuList {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.adminMenuRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.adminMenuLeft {
+  min-width: 0;
+}
+
+.adminMenuName {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminMenuMeta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminMenuRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adminMenuPrice {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .adminList {
   display: flex;
   flex-direction: column;

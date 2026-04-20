@@ -48,13 +48,5 @@ public class MenuSeeder implements ApplicationRunner {
 			menuItemRepository.save(new MenuItem(names[0], category, unit, price, imageUrl));
 			return;
 		}
-
-		item.setCategory(category);
-		item.setUnit(unit);
-		item.setPrice(price);
-		if (item.getImageUrl() == null || item.getImageUrl().isBlank()) {
-			item.setImageUrl(imageUrl);
-		}
-		menuItemRepository.save(item);
 	}
 }

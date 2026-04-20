@@ -31,12 +31,11 @@ public class AdminOrderController {
 		return adminOrderService.listPendingOrders(limit);
 	}
 
-	@PostMapping("/{orderId}/confirm-cash")
-	public OrderResponse confirmCash(
+	@PostMapping("/{orderId}/confirm")
+	public OrderResponse confirm(
 		@PathVariable Long orderId,
 		@Valid @RequestBody(required = false) ConfirmCashPaymentRequest request
 	) {
-		return adminOrderService.confirmCashPayment(orderId, request);
+		return adminOrderService.confirmPayment(orderId, request);
 	}
 }
-

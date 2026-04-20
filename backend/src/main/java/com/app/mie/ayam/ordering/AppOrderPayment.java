@@ -39,6 +39,8 @@ public class AppOrderPayment {
 	@Column(nullable = false)
 	private int changeAmount;
 
+	private Boolean confirmed;
+
 	protected AppOrderPayment() {
 	}
 
@@ -48,6 +50,7 @@ public class AppOrderPayment {
 		this.paidAt = paidAt;
 		this.amountPaid = amountPaid;
 		this.changeAmount = changeAmount;
+		this.confirmed = true;
 	}
 
 	public Long getId() {
@@ -73,5 +76,24 @@ public class AppOrderPayment {
 	public int getChangeAmount() {
 		return changeAmount;
 	}
-}
 
+	public boolean isConfirmed() {
+		return confirmed == null || confirmed;
+	}
+
+	public void setConfirmed(boolean confirmed) {
+		this.confirmed = confirmed;
+	}
+
+	public void setPaidAt(Instant paidAt) {
+		this.paidAt = paidAt;
+	}
+
+	public void setAmountPaid(int amountPaid) {
+		this.amountPaid = amountPaid;
+	}
+
+	public void setChangeAmount(int changeAmount) {
+		this.changeAmount = changeAmount;
+	}
+}
