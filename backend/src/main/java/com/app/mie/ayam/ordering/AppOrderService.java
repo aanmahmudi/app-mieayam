@@ -106,7 +106,7 @@ public class AppOrderService {
 			if (existingPayment.isConfirmed()) {
 				throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dibayar.");
 			}
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Pembayaran sedang menunggu konfirmasi admin.");
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Pembayaran sedang diproses.");
 		}
 
 		int total = order.getTotal();
@@ -130,10 +130,26 @@ public class AppOrderService {
 		}
 
 		AppOrderPayment payment = new AppOrderPayment(order, method, Instant.now(), amountPaid, changeAmount);
-		if (method != PaymentMethod.CASH) {
-			payment.setConfirmed(false);
+		if (method == PaymentMethod.BANK) {
+			payment.setBank(request.bank());
 		}
 		AppOrderPayment savedPayment = paymentRepository.save(payment);
 		return OrderResponse.from(order, savedPayment);
+	}
+
+	@Transactional
+	public void cancelOrder(String username, Long orderId) {
+		AppOrder order = orderRepository.findByIdAndUserUsername(orderId, username)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order tidak ditemukan."));
+
+		AppOrderPayment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
+		if (payment != null && payment.isConfirmed()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dibayar dan tidak bisa dibatalkan.");
+		}
+		if (payment != null) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Pembayaran sedang diproses.");
+		}
+
+		orderRepository.delete(order);
 	}
 }

@@ -13,17 +13,14 @@ import com.app.mie.ayam.menu.dto.MenuItemResponse;
 @RequestMapping("/api/menu")
 public class MenuController {
 
-	private final MenuItemRepository menuItemRepository;
+	private final MenuService menuService;
 
-	public MenuController(MenuItemRepository menuItemRepository) {
-		this.menuItemRepository = menuItemRepository;
+	public MenuController(MenuService menuService) {
+		this.menuService = menuService;
 	}
 
 	@GetMapping
 	public List<MenuItemResponse> list(@RequestParam(required = false) MenuCategory category) {
-		if (category == null) {
-			return menuItemRepository.findAll().stream().map(MenuItemResponse::from).toList();
-		}
-		return menuItemRepository.findAllByCategoryOrderByNameAsc(category).stream().map(MenuItemResponse::from).toList();
+		return menuService.list(category);
 	}
 }

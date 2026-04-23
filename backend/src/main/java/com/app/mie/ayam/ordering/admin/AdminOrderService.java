@@ -36,7 +36,7 @@ public class AdminOrderService {
 			.map(order -> new java.util.AbstractMap.SimpleEntry<>(order, paymentRepository.findByOrderId(order.getId()).orElse(null)))
 			.filter(entry -> entry.getValue() != null)
 			.filter(entry -> !entry.getValue().isConfirmed())
-			.filter(entry -> entry.getValue().getMethod() != PaymentMethod.CASH)
+			.filter(entry -> entry.getValue().getMethod() == PaymentMethod.QRIS)
 			.map(entry -> AdminPendingOrderResponse.from(entry.getKey(), entry.getValue()))
 			.toList();
 	}
@@ -50,6 +50,9 @@ public class AdminOrderService {
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order belum memiliki data pembayaran."));
 		if (payment.isConfirmed()) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dikonfirmasi.");
+		}
+		if (payment.getMethod() != PaymentMethod.QRIS) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hanya QRIS yang perlu konfirmasi.");
 		}
 
 		int total = order.getTotal();

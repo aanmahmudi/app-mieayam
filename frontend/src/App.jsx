@@ -1,87 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { AuthCard } from './components/AuthCard.jsx'
+import { AdminMenuPanel } from './components/AdminMenuPanel.jsx'
+import { HistorySheet } from './components/HistorySheet.jsx'
+import { OrderSheet } from './components/OrderSheet.jsx'
+import { PaymentSheet } from './components/PaymentSheet.jsx'
+import { ReceiptSheet } from './components/ReceiptSheet.jsx'
+import { Stepper } from './components/Stepper.jsx'
+import { apiFetch } from './lib/api.js'
+import { rupiah } from './lib/format.js'
+import { getAuthRouteFromLocation, normalizeLegacyHashRoute } from './lib/routing.js'
+import { categories } from './menu/categories.js'
+import { ExtraMenu } from './menu/ExtraMenu.jsx'
+import { MakananMenu } from './menu/MakananMenu.jsx'
+import { MinumanMenu } from './menu/MinumanMenu.jsx'
 
 const TOKEN_KEY = 'mieayam_token'
-
-const rupiah = new Intl.NumberFormat('id-ID', {
-  style: 'currency',
-  currency: 'IDR',
-  maximumFractionDigits: 0,
-})
-
-async function apiFetch(path, { token, method, body } = {}) {
-  const res = await fetch(path, {
-    method: method ?? 'GET',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    const contentType = res.headers.get('content-type') ?? ''
-    const status = res.status
-    if ((status === 401 || status === 403) && path === '/api/auth/login') {
-      throw new Error('Username/password salah')
-    }
-
-    let parsed = null
-    if (contentType.includes('application/json') && text) {
-      try {
-        parsed = JSON.parse(text)
-      } catch {
-        parsed = null
-      }
-    }
-
-    const messageFromServer = (parsed && (parsed.message || parsed.error)) || text
-    if (messageFromServer) throw new Error(messageFromServer)
-
-    if (status === 401) throw new Error('Sesi habis. Silakan login lagi.')
-    if (status === 403) throw new Error('Akses ditolak.')
-    throw new Error(`Request gagal (${status})`)
-  }
-
-  if (res.status === 204) return null
-
-  const text = await res.text()
-  if (!text) return null
-
-  const contentType = res.headers.get('content-type') ?? ''
-  if (contentType.includes('application/json')) return JSON.parse(text)
-  return text
-}
-
-function normalizeLegacyHashRoute() {
-  const hash = window.location.hash || ''
-  if (!hash) return
-  if (hash.startsWith('#/')) {
-    const path = hash.slice(1)
-    window.history.replaceState(null, '', path)
-    return
-  }
-}
-
-function getAuthRouteFromLocation() {
-  const path = window.location.pathname || '/'
-  if (path === '/register') return 'register'
-  return 'login'
-}
-
-function formatDateTime(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '')
@@ -104,11 +38,8 @@ function App() {
   const [orderHistory, setOrderHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [errorHistory, setErrorHistory] = useState('')
-  const [adminPending, setAdminPending] = useState([])
-  const [loadingAdmin, setLoadingAdmin] = useState(false)
-  const [errorAdmin, setErrorAdmin] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [adminSection, setAdminSection] = useState('cash')
+  const [bankChoice, setBankChoice] = useState('BRI')
   const [adminMenuItems, setAdminMenuItems] = useState([])
   const [loadingAdminMenu, setLoadingAdminMenu] = useState(false)
   const [errorAdminMenu, setErrorAdminMenu] = useState('')
@@ -123,15 +54,6 @@ function App() {
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginStatus, setLoginStatus] = useState('')
-
-  const categories = useMemo(
-    () => [
-      { key: 'MAKANAN', label: 'Makanan' },
-      { key: 'MINUMAN', label: 'Minuman' },
-      { key: 'EXTRA', label: 'Extra' },
-    ],
-    []
-  )
 
   useEffect(() => {
     normalizeLegacyHashRoute()
@@ -204,8 +126,6 @@ function App() {
       window.history.pushState(null, '', '/')
       setOrderHistory([])
       setErrorHistory('')
-      setAdminPending([])
-      setErrorAdmin('')
     } catch (err) {
       setLoginStatus(err.message)
     }
@@ -228,9 +148,6 @@ function App() {
     setErrorHistory('')
     setWalletBalance(0)
     setWalletTxs([])
-    setAdminPending([])
-    setLoadingAdmin(false)
-    setErrorAdmin('')
     setIsAdmin(false)
     setSheetMode('order')
     window.history.pushState(null, '', '/login')
@@ -256,7 +173,7 @@ function App() {
   const pendingPayment = !!lastOrder && lastOrder.status === 'CREATED'
   const sheetTitle =
     sheetMode === 'admin'
-      ? 'Admin Kasir'
+      ? 'Admin Menu'
       : sheetMode === 'payment'
         ? 'Pembayaran'
         : sheetMode === 'receipt'
@@ -277,21 +194,6 @@ function App() {
       setErrorHistory(err.message)
     } finally {
       setLoadingHistory(false)
-    }
-  }, [token])
-
-  const loadAdminPending = useCallback(async () => {
-    if (!token) return
-    setLoadingAdmin(true)
-    setErrorAdmin('')
-    try {
-      const data = await apiFetch('/api/admin/orders/pending?limit=50', { token })
-      setAdminPending(Array.isArray(data) ? data : [])
-    } catch (err) {
-      setErrorAdmin(err.message)
-      setAdminPending([])
-    } finally {
-      setLoadingAdmin(false)
     }
   }, [token])
 
@@ -329,7 +231,6 @@ function App() {
       setOrderHistory([])
       setWalletTxs([])
       setWalletBalance(0)
-      setAdminPending([])
       setIsAdmin(false)
       if (sheetMode === 'admin') setSheetMode('order')
     }
@@ -385,7 +286,7 @@ function App() {
           ? { method: 'CASH', amountPaid: cashPaid ? Number.parseInt(cashPaid, 10) : null }
           : paymentMethod === 'QRIS'
             ? { method: 'QRIS', amountPaid: null }
-            : { method: 'BANK', amountPaid: null }
+            : { method: 'BANK', amountPaid: null, bank: bankChoice }
       const data = await apiFetch(`/api/orders/${lastOrder.id}/pay`, { token, method: 'POST', body: payload })
       setLastOrder(data ?? lastOrder)
       apiFetch('/api/wallet/me', { token })
@@ -395,9 +296,7 @@ function App() {
         .then((d) => setWalletTxs(Array.isArray(d) ? d : []))
         .catch(() => {})
       await loadHistory()
-      if (data?.status !== 'PAID') {
-        setOrderStatus('Pembayaran dikirim. Menunggu konfirmasi admin.')
-      } else if (data?.changeAmount) {
+      if (data?.changeAmount) {
         setOrderStatus(`Pembayaran berhasil. Kembalian: ${rupiah.format(data.changeAmount)}`)
       } else {
         setOrderStatus('Pembayaran berhasil.')
@@ -411,14 +310,17 @@ function App() {
     }
   }
 
-  async function confirmPaymentAsAdmin(orderId) {
-    if (!token) return
+  async function cancelOrder(orderId) {
+    if (!token || !orderId || paying) return
     setOrderStatus('')
     try {
-      await apiFetch(`/api/admin/orders/${orderId}/confirm`, { token, method: 'POST', body: {} })
-      setOrderStatus(`Order #${orderId} berhasil dikonfirmasi.`)
-      loadAdminPending()
-      loadHistory()
+      await apiFetch(`/api/orders/${orderId}/cancel`, { token, method: 'POST' })
+      await loadHistory()
+      if (lastOrder?.id === orderId) {
+        setLastOrder(null)
+        setSheetMode('order')
+      }
+      setOrderStatus('Pesanan dibatalkan.')
     } catch (err) {
       setOrderStatus(err.message)
     }
@@ -490,77 +392,23 @@ function App() {
       ) : null}
 
       {!token ? (
-        <section className="card authCard">
-          {authRoute === 'register' ? (
-            <>
-              <h2>Register</h2>
-              <form className="form" onSubmit={handleRegister}>
-                <label className="field">
-                  <div className="label">Username</div>
-                  <input
-                    className="input"
-                    value={registerUsername}
-                    onChange={(e) => setRegisterUsername(e.target.value)}
-                    placeholder="contoh: admin"
-                  />
-                </label>
-                <label className="field">
-                  <div className="label">Password</div>
-                  <input
-                    className="input"
-                    type="password"
-                    value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    placeholder="minimal 6 karakter"
-                  />
-                </label>
-                <button className="button primary" type="submit">
-                  Register
-                </button>
-                {registerStatus ? <div className="status">{registerStatus}</div> : null}
-              </form>
-              <div className="status">
-                Sudah punya akun?{' '}
-                <button className="linkButton" type="button" onClick={goToLogin}>
-                  Login
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2>Login</h2>
-              <form className="form" onSubmit={handleLogin}>
-                <label className="field">
-                  <div className="label">Username</div>
-                  <input
-                    className="input"
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value)}
-                  />
-                </label>
-                <label className="field">
-                  <div className="label">Password</div>
-                  <input
-                    className="input"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                  />
-                </label>
-                <button className="button primary" type="submit">
-                  Login
-                </button>
-                {loginStatus ? <div className="status">{loginStatus}</div> : null}
-              </form>
-              <div className="status">
-                Belum punya akun?{' '}
-                <button className="linkButton" type="button" onClick={goToRegister}>
-                  Register
-                </button>
-              </div>
-            </>
-          )}
-        </section>
+        <AuthCard
+          authRoute={authRoute}
+          registerUsername={registerUsername}
+          setRegisterUsername={setRegisterUsername}
+          registerPassword={registerPassword}
+          setRegisterPassword={setRegisterPassword}
+          registerStatus={registerStatus}
+          onRegister={handleRegister}
+          onGoToLogin={goToLogin}
+          loginUsername={loginUsername}
+          setLoginUsername={setLoginUsername}
+          loginPassword={loginPassword}
+          setLoginPassword={setLoginPassword}
+          loginStatus={loginStatus}
+          onLogin={handleLogin}
+          onGoToRegister={goToRegister}
+        />
       ) : (
         <>
           <header className="header">
@@ -574,12 +422,11 @@ function App() {
                   type="button"
                   onClick={() => {
                     setSheetMode('admin')
-                    setAdminSection('cash')
                     setCartOpen(true)
-                    loadAdminPending()
+                    loadAdminMenu()
                   }}
-                  disabled={loadingAdmin}
-                  aria-label="Admin Kasir"
+                  disabled={loadingAdminMenu}
+                  aria-label="Admin Menu"
                 >
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path
@@ -641,45 +488,13 @@ function App() {
             {loadingMenu ? <div className="status">Memuat menu...</div> : null}
             {errorMenu ? <div className="status error">{errorMenu}</div> : null}
 
-            <div className="menuList">
-              {items.map((it) => (
-                <div className="menuRow" key={it.id}>
-                  <div className="menuLeft">
-                    {it.imageUrl ? (
-                      <img className="menuThumb" alt={it.name} src={encodeURI(it.imageUrl)} loading="lazy" />
-                    ) : null}
-                    <div>
-                    <div className="menuName">{it.name}</div>
-                    {it.unit && it.category !== 'MINUMAN' ? <div className="menuUnit">{it.unit}</div> : null}
-                    </div>
-                  </div>
-                  <div className="menuRight">
-                    <div className="menuPrice">{rupiah.format(it.price)}</div>
-                    <div className="qtyControl">
-                      <button
-                        className="qtyBtn"
-                        type="button"
-                        onClick={() => setCartItemQuantity(it, (cart[it.id]?.quantity ?? 0) - 1)}
-                        disabled={ordering || (cart[it.id]?.quantity ?? 0) <= 0}
-                      >
-                        −
-                      </button>
-                      <div className="qtyNum">{cart[it.id]?.quantity ?? 0}</div>
-                      <button
-                        className="qtyBtn"
-                        type="button"
-                        onClick={() => {
-                          setCartItemQuantity(it, (cart[it.id]?.quantity ?? 0) + 1)
-                        }}
-                        disabled={ordering || (cart[it.id]?.quantity ?? 0) >= 99}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {activeCategory === 'MAKANAN' ? (
+              <MakananMenu items={items} cart={cart} ordering={ordering} onSetQuantity={setCartItemQuantity} />
+            ) : activeCategory === 'MINUMAN' ? (
+              <MinumanMenu items={items} cart={cart} ordering={ordering} onSetQuantity={setCartItemQuantity} />
+            ) : (
+              <ExtraMenu items={items} cart={cart} ordering={ordering} onSetQuantity={setCartItemQuantity} />
+            )}
           </section>
 
           {cartCount ? (
@@ -773,454 +588,91 @@ function App() {
                   </div>
 
                   {sheetMode !== 'history' && sheetMode !== 'admin' ? (
-                    <div className="stepper">
-                      <div className={`step ${stepIndex >= 0 ? 'active' : ''}`}>
-                        <div className={`stepDot ${stepIndex >= 0 ? 'active' : ''}`}>1</div>
-                        <div className="stepLabel">Pesanan</div>
-                      </div>
-                      <div className={`stepLine ${stepIndex >= 1 ? 'active' : ''}`} />
-                      <div className={`step ${stepIndex >= 1 ? 'active' : ''}`}>
-                        <div className={`stepDot ${stepIndex >= 1 ? 'active' : ''}`}>2</div>
-                        <div className="stepLabel">Pembayaran</div>
-                      </div>
-                      <div className={`stepLine ${stepIndex >= 2 ? 'active' : ''}`} />
-                      <div className={`step ${stepIndex >= 2 ? 'active' : ''}`}>
-                        <div className={`stepDot ${stepIndex >= 2 ? 'active' : ''}`}>3</div>
-                        <div className="stepLabel">Struk</div>
-                      </div>
-                    </div>
+                    <Stepper
+                      stepIndex={stepIndex}
+                      canGoOrder={cartCount || lastOrder}
+                      canGoPayment={pendingPayment || lastOrder}
+                      canGoReceipt={lastOrder}
+                      onGoOrder={() => setSheetMode('order')}
+                      onGoPayment={() => setSheetMode('payment')}
+                      onGoReceipt={() => setSheetMode('receipt')}
+                    />
                   ) : null}
 
                   <div className="modalBody">
                     {sheetMode === 'admin' ? (
-                      <div className="adminPanel">
-                        <div className="receiptHeader">
-                          <div className="receiptTitle">Admin</div>
-                          <button
-                            className="button"
-                            type="button"
-                            onClick={adminSection === 'menu' ? loadAdminMenu : loadAdminPending}
-                            disabled={loadingAdmin || loadingAdminMenu}
-                          >
-                            {loadingAdmin || loadingAdminMenu ? 'Memuat...' : 'Refresh'}
-                          </button>
-                        </div>
-                        <div className="adminTabs">
-                          <button
-                            type="button"
-                            className={`adminTabBtn ${adminSection === 'cash' ? 'active' : ''}`}
-                            onClick={() => {
-                              setAdminSection('cash')
-                              loadAdminPending()
-                            }}
-                            disabled={loadingAdmin || loadingAdminMenu}
-                          >
-                            Konfirmasi
-                          </button>
-                          <button
-                            type="button"
-                            className={`adminTabBtn ${adminSection === 'menu' ? 'active' : ''}`}
-                            onClick={() => {
-                              setAdminSection('menu')
-                              loadAdminMenu()
-                            }}
-                            disabled={loadingAdmin || loadingAdminMenu}
-                          >
-                            Menu
-                          </button>
-                        </div>
-                        {errorAdmin ? <div className="status error">{errorAdmin}</div> : null}
-                        {adminSection === 'cash' ? (
-                          <>
-                            {!loadingAdmin && !adminPending.length ? <div className="payHint">Tidak ada order pending.</div> : null}
-                            <div className="adminList">
-                              {adminPending.map((o) => (
-                                <div className="adminCard" key={o.id}>
-                                  <div className="adminTop">
-                                    <div className="adminLeft">
-                                      <div className="adminTitle">Order #{o.id}</div>
-                                      <div className="adminMeta">
-                                        {o.username} • {o.paymentMethod} • {formatDateTime(o.createdAt)}
-                                      </div>
-                                    </div>
-                                    <div className="adminTotal">{rupiah.format(o.total)}</div>
-                                  </div>
-                                  <div className="adminItems">
-                                    {(o.items ?? []).slice(0, 2).map((it) => (
-                                      <div className="adminItem" key={it.menuItemId}>
-                                        {it.quantity} x {it.name}
-                                      </div>
-                                    ))}
-                                    {(o.items ?? []).length > 2 ? <div className="adminItemMore">+{o.items.length - 2} item</div> : null}
-                                  </div>
-                                  <button className="button primary" type="button" onClick={() => confirmPaymentAsAdmin(o.id)}>
-                                    Konfirmasi Pembayaran
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            {errorAdminMenu ? <div className="status error">{errorAdminMenu}</div> : null}
-                            <div className="adminMenuForm">
-                              <div className="label">{menuDraft.id ? 'Edit Menu' : 'Tambah Menu'}</div>
-                              <input
-                                className="input"
-                                placeholder="Nama menu"
-                                value={menuDraft.name}
-                                onChange={(e) => setMenuDraft((p) => ({ ...p, name: e.target.value }))}
-                                disabled={savingMenu}
-                              />
-                              <div className="adminMenuGrid">
-                                <select
-                                  className="input"
-                                  value={menuDraft.category}
-                                  onChange={(e) => setMenuDraft((p) => ({ ...p, category: e.target.value }))}
-                                  disabled={savingMenu}
-                                >
-                                  <option value="MAKANAN">MAKANAN</option>
-                                  <option value="MINUMAN">MINUMAN</option>
-                                  <option value="EXTRA">EXTRA</option>
-                                </select>
-                                <input
-                                  className="input"
-                                  placeholder="Unit (opsional)"
-                                  value={menuDraft.unit}
-                                  onChange={(e) => setMenuDraft((p) => ({ ...p, unit: e.target.value }))}
-                                  disabled={savingMenu}
-                                />
-                              </div>
-                              <div className="adminMenuGrid">
-                                <input
-                                  className="input"
-                                  inputMode="numeric"
-                                  placeholder="Harga"
-                                  value={menuDraft.price}
-                                  onChange={(e) => setMenuDraft((p) => ({ ...p, price: e.target.value.replace(/[^\d]/g, '') }))}
-                                  disabled={savingMenu}
-                                />
-                                <input
-                                  className="input"
-                                  placeholder="Image URL (opsional)"
-                                  value={menuDraft.imageUrl}
-                                  onChange={(e) => setMenuDraft((p) => ({ ...p, imageUrl: e.target.value }))}
-                                  disabled={savingMenu}
-                                />
-                              </div>
-                              <div className="adminMenuActions">
-                                <button className="button primary" type="button" onClick={saveAdminMenuItem} disabled={savingMenu}>
-                                  {savingMenu ? 'Menyimpan...' : menuDraft.id ? 'Update' : 'Tambah'}
-                                </button>
-                                {menuDraft.id ? (
-                                  <button
-                                    className="button"
-                                    type="button"
-                                    onClick={() => setMenuDraft({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })}
-                                    disabled={savingMenu}
-                                  >
-                                    Batal
-                                  </button>
-                                ) : null}
-                              </div>
-                            </div>
-                            <div className="adminMenuList">
-                              {loadingAdminMenu ? <div className="payHint">Memuat menu...</div> : null}
-                              {!loadingAdminMenu && !adminMenuItems.length ? <div className="payHint">Menu kosong.</div> : null}
-                              {adminMenuItems
-                                .slice()
-                                .sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
-                                .map((it) => (
-                                  <div className="adminMenuRow" key={it.id}>
-                                    <div className="adminMenuLeft">
-                                      <div className="adminMenuName">{it.name}</div>
-                                      <div className="adminMenuMeta">
-                                        {it.category}
-                                        {it.unit ? ` • ${it.unit}` : ''}
-                                      </div>
-                                    </div>
-                                    <div className="adminMenuRight">
-                                      <div className="adminMenuPrice">{rupiah.format(it.price)}</div>
-                                      <button
-                                        className="button"
-                                        type="button"
-                                        onClick={() =>
-                                          setMenuDraft({
-                                            id: it.id,
-                                            name: it.name ?? '',
-                                            category: it.category ?? 'MAKANAN',
-                                            unit: it.unit ?? '',
-                                            price: String(it.price ?? ''),
-                                            imageUrl: it.imageUrl ?? '',
-                                          })
-                                        }
-                                        disabled={savingMenu}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button className="button" type="button" onClick={() => deleteAdminMenuItem(it.id)} disabled={savingMenu}>
-                                        Hapus
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <AdminMenuPanel
+                        errorAdminMenu={errorAdminMenu}
+                        menuDraft={menuDraft}
+                        setMenuDraft={setMenuDraft}
+                        savingMenu={savingMenu}
+                        onSaveMenuItem={saveAdminMenuItem}
+                        onRefreshMenu={loadAdminMenu}
+                        adminMenuItems={adminMenuItems}
+                        loadingAdminMenu={loadingAdminMenu}
+                        onDeleteMenuItem={deleteAdminMenuItem}
+                      />
                     ) : null}
 
                     {sheetMode === 'order' ? (
-                      cartCount ? (
-                        <>
-                          <div className="cartItems">
-                            {cartEntries
-                              .slice()
-                              .sort((a, b) => a.item.name.localeCompare(b.item.name))
-                              .map((e) => (
-                                <div className="cartRow" key={e.item.id}>
-                                  <div className="cartLeft">
-                                    <div className="cartName">{e.item.name}</div>
-                                    <div className="cartSub">{rupiah.format(e.item.price)}</div>
-                                  </div>
-                                  <div className="cartActions">
-                                    <button
-                                      className="qtyBtn"
-                                      type="button"
-                                      onClick={() => setCartItemQuantity(e.item, e.quantity - 1)}
-                                      disabled={ordering || e.quantity <= 0}
-                                    >
-                                      −
-                                    </button>
-                                    <div className="qtyNum">{e.quantity}</div>
-                                    <button
-                                      className="qtyBtn"
-                                      type="button"
-                                      onClick={() => setCartItemQuantity(e.item, e.quantity + 1)}
-                                      disabled={ordering || e.quantity >= 99}
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                  <div className="cartSubtotal">{rupiah.format(e.quantity * e.item.price)}</div>
-                                </div>
-                              ))}
-                          </div>
-                          <button className="button primary cartSubmit" type="button" onClick={submitOrder} disabled={ordering}>
-                            {ordering ? 'Memproses...' : 'Buat Pesanan'}
-                          </button>
-                        </>
-                      ) : (
-                        <div className="payHint">Pilih menu dulu dengan tombol +.</div>
-                      )
+                      <OrderSheet
+                        cartCount={cartCount}
+                        cartEntries={cartEntries}
+                        ordering={ordering}
+                        onSetQuantity={setCartItemQuantity}
+                        onSubmitOrder={submitOrder}
+                        lastOrder={lastOrder}
+                        onGoToPayment={() => setSheetMode('payment')}
+                      />
                     ) : null}
 
                     {sheetMode === 'payment' ? (
-                      pendingPayment ? (
-                        <div className="payWrap">
-                          <div className="paySummary">
-                            <div className="payLabel">Total</div>
-                            <div className="payValue">{rupiah.format(lastOrder?.total ?? 0)}</div>
-                          </div>
-                          <div className="payHint">Status: Belum dibayar</div>
-                          <div className="payMethods">
-                            <button
-                              type="button"
-                              className={`payMethodBtn ${paymentMethod === 'CASH' ? 'active' : ''}`}
-                              onClick={() => {
-                                setPaymentMethod('CASH')
-                                setCashPaid('')
-                              }}
-                              disabled={paying}
-                            >
-                              Cash
-                            </button>
-                            <button
-                              type="button"
-                              className={`payMethodBtn ${paymentMethod === 'QRIS' ? 'active' : ''}`}
-                              onClick={() => setPaymentMethod('QRIS')}
-                              disabled={paying}
-                            >
-                              QRIS
-                            </button>
-                            <button
-                              type="button"
-                              className={`payMethodBtn ${paymentMethod === 'BANK' ? 'active' : ''}`}
-                              onClick={() => setPaymentMethod('BANK')}
-                              disabled={paying}
-                            >
-                              Bank
-                            </button>
-                          </div>
-                          {paymentMethod === 'CASH' ? (
-                            <div className="payCash">
-                              <div className="label">Pembayaran</div>
-                              <input
-                                className="input"
-                                placeholder="Pembayaran di kasir / cash"
-                                value="Pembayaran di kasir / cash"
-                                readOnly
-                                disabled
-                              />
-                              <div className="payHint">Cash diproses langsung tanpa konfirmasi admin.</div>
-                            </div>
-                          ) : paymentMethod === 'QRIS' ? (
-                            <div className="payHint">QRIS perlu konfirmasi admin setelah bayar.</div>
-                          ) : (
-                            <div className="payBank">
-                              <div className="paySummary">
-                                <div className="payLabel">Saldo</div>
-                                <div className="payValue">{rupiah.format(walletBalance)}</div>
-                              </div>
-                              <div className="payHint">Bank perlu konfirmasi admin setelah bayar.</div>
-                              <div className="txTitle">Mutasi (terakhir)</div>
-                              <div className="txList">
-                                {walletTxs.length ? (
-                                  walletTxs.map((tx) => (
-                                    <div className="txRow" key={tx.id}>
-                                      <div className="txLeft">
-                                        <div className="txType">{tx.type === 'TOP_UP' ? 'Top up' : 'Pembayaran'}</div>
-                                        {tx.orderId ? <div className="txMeta">Order #{tx.orderId}</div> : <div className="txMeta">Saldo: {rupiah.format(tx.balanceAfter)}</div>}
-                                      </div>
-                                      <div className={`txAmount ${tx.amount < 0 ? 'neg' : 'pos'}`}>{rupiah.format(tx.amount)}</div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="payHint">Belum ada transaksi.</div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          <button
-                            className="button primary cartSubmit"
-                            type="button"
-                            onClick={payOrder}
-                            disabled={
-                              paying ||
-                              (paymentMethod === 'BANK' && walletBalance < (lastOrder?.total ?? 0))
-                            }
-                          >
-                            {paying ? 'Memproses...' : 'Bayar'}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="payHint">Buat pesanan dulu untuk melakukan pembayaran.</div>
-                      )
+                      <PaymentSheet
+                        pendingPayment={pendingPayment}
+                        lastOrder={lastOrder}
+                        paymentMethod={paymentMethod}
+                        setPaymentMethod={setPaymentMethod}
+                        cashPaid={cashPaid}
+                        setCashPaid={setCashPaid}
+                        paying={paying}
+                        walletBalance={walletBalance}
+                        walletTxs={walletTxs}
+                        bankChoice={bankChoice}
+                        setBankChoice={setBankChoice}
+                        onPay={payOrder}
+                        onCancel={() => cancelOrder(lastOrder?.id)}
+                      />
                     ) : null}
 
-                    {sheetMode === 'receipt' && lastOrder ? (
-                      <div className="receipt">
-                        <div className="receiptHeader">
-                          <div className="receiptTitle">Struk Pembayaran</div>
-                          <div className="receiptMeta">{formatDateTime(lastOrder.createdAt)}</div>
-                        </div>
-                        <div className="receiptItems">
-                          {(lastOrder.items ?? []).map((it) => (
-                            <div className="receiptItemRow" key={it.menuItemId}>
-                              <div className="receiptItemName">{it.name}</div>
-                              <div className="receiptItemQty">
-                                {it.quantity} x {rupiah.format(it.priceEach)}
-                              </div>
-                              <div className="receiptItemSub">{rupiah.format(it.subtotal)}</div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="receiptTotals">
-                          <div className="receiptTotalRow">
-                            <div>Total</div>
-                            <div className="receiptStrong">{rupiah.format(lastOrder.total ?? 0)}</div>
-                          </div>
-                          <div className="receiptTotalRow">
-                            <div>Status</div>
-                            <div className="receiptStrong">{lastOrder.status === 'PAID' ? 'Lunas' : 'Belum dibayar'}</div>
-                          </div>
-                          {lastOrder.status !== 'PAID' ? (
-                            <div className="receiptTotalRow">
-                              <div>Metode</div>
-                              <div className="receiptStrong">{lastOrder.paymentMethod ?? paymentMethod ?? '-'}</div>
-                            </div>
-                          ) : null}
-                          {lastOrder.status === 'PAID' ? (
-                            <>
-                              <div className="receiptTotalRow">
-                                <div>Metode</div>
-                                <div className="receiptStrong">{lastOrder.paymentMethod ?? '-'}</div>
-                              </div>
-                              <div className="receiptTotalRow">
-                                <div>Dibayar</div>
-                                <div className="receiptStrong">{rupiah.format(lastOrder.amountPaid ?? 0)}</div>
-                              </div>
-                              <div className="receiptTotalRow">
-                                <div>Kembalian</div>
-                                <div className="receiptStrong">{rupiah.format(lastOrder.changeAmount ?? 0)}</div>
-                              </div>
-                            </>
-                          ) : null}
-                        </div>
-                        <button
-                          className="button primary receiptDone"
-                          type="button"
-                          onClick={async () => {
-                            await loadHistory()
-                            setLastOrder(null)
-                            setCartOpen(false)
-                          }}
-                        >
-                          Selesai
-                        </button>
-                      </div>
+                    {sheetMode === 'receipt' ? (
+                      <ReceiptSheet
+                        lastOrder={lastOrder}
+                        paymentMethod={paymentMethod}
+                        onDone={async () => {
+                          await loadHistory()
+                          setLastOrder(null)
+                          setCartOpen(false)
+                        }}
+                      />
                     ) : null}
 
                     {sheetMode === 'history' ? (
-                      <div className="history">
-                        <div className="receiptHeader">
-                          <div className="receiptTitle">Riwayat Pesanan</div>
-                          <button className="button" type="button" onClick={loadHistory} disabled={loadingHistory}>
-                            {loadingHistory ? 'Memuat...' : 'Refresh'}
-                          </button>
-                        </div>
-                        {errorHistory ? <div className="status error">{errorHistory}</div> : null}
-                        {!loadingHistory && !orderHistory.length ? <div className="payHint">Belum ada riwayat pesanan.</div> : null}
-                        <div className="historyList">
-                          {orderHistory.map((o, index) => {
-                            const seq = orderHistory.length - index
-                            return (
-                            <div className="historyCard" key={o.id}>
-                              <div className="historyTop">
-                                <div className="historyTopLeft">
-                                  <div className="historyOrderId">Pesanan #{seq}</div>
-                                  <div className="historyWhen">{formatDateTime(o.createdAt)}</div>
-                                </div>
-                                <div className={`historyBadge ${o.status === 'PAID' ? 'paid' : 'pending'}`}>
-                                  {o.status === 'PAID' ? 'Lunas' : 'Belum dibayar'}
-                                </div>
-                              </div>
-                              <div className="historyMid">
-                                <div className="historyAmount">{rupiah.format(o.total)}</div>
-                                <div className="historyMetaLine">
-                                  {(o.items?.length ?? 0) ? `${o.items.length} item` : 'Tanpa item'} {o.paymentMethod ? `• ${o.paymentMethod}` : null}
-                                </div>
-                              </div>
-                              <div className="historyActions">
-                                <button
-                                  className="button primary"
-                                  type="button"
-                                  onClick={() => {
-                                    setLastOrder(o)
-                                    setSheetMode(o.status === 'PAID' ? 'receipt' : 'payment')
-                                  }}
-                                >
-                                  {o.status === 'PAID' ? 'Lihat Struk' : 'Bayar'}
-                                </button>
-                              </div>
-                            </div>
-                            )
-                          })}
-                        </div>
-                      </div>
+                      <HistorySheet
+                        orderHistory={orderHistory}
+                        loadingHistory={loadingHistory}
+                        errorHistory={errorHistory}
+                        onRefresh={loadHistory}
+                        onSelectOrder={(o) => {
+                          setLastOrder(o)
+                          setSheetMode(o.status === 'PAID' ? 'receipt' : 'payment')
+                        }}
+                        onCancelOrder={cancelOrder}
+                      />
                     ) : null}
 
-                    {orderStatus ? <div className={`status ${orderStatus.includes('berhasil') ? '' : 'error'}`}>{orderStatus}</div> : null}
+                    {orderStatus ? (
+                      <div className={`status ${orderStatus.includes('berhasil') || orderStatus.includes('dibatalkan') ? '' : 'error'}`}>{orderStatus}</div>
+                    ) : null}
                   </div>
                 </div>
               </div>

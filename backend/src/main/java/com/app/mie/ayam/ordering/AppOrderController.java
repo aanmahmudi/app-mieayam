@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.app.mie.ayam.ordering.dto.CreateOrderRequest;
 import com.app.mie.ayam.ordering.dto.OrderResponse;
@@ -31,16 +32,29 @@ public class AppOrderController {
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public OrderResponse create(Principal principal, @Valid @RequestBody CreateOrderRequest request) {
-		return orderService.createOrder(principal.getName(), request);
+		return orderService.createOrder(requireUsername(principal), request);
 	}
 
 	@GetMapping("/my")
 	public List<OrderResponse> listMyOrders(Principal principal) {
-		return orderService.listOrders(principal.getName());
+		return orderService.listOrders(requireUsername(principal));
 	}
 
 	@PostMapping("/{orderId}/pay")
 	public OrderResponse pay(Principal principal, @PathVariable Long orderId, @Valid @RequestBody PayOrderRequest request) {
-		return orderService.payOrder(principal.getName(), orderId, request);
+		return orderService.payOrder(requireUsername(principal), orderId, request);
+	}
+
+	@PostMapping("/{orderId}/cancel")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void cancel(Principal principal, @PathVariable Long orderId) {
+		orderService.cancelOrder(requireUsername(principal), orderId);
+	}
+
+	private static String requireUsername(Principal principal) {
+		if (principal == null) {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesi habis. Silakan login lagi.");
+		}
+		return principal.getName();
 	}
 }

@@ -41,6 +41,9 @@ public class AppOrderPayment {
 
 	private Boolean confirmed;
 
+	@Column(length = 30)
+	private String bank;
+
 	protected AppOrderPayment() {
 	}
 
@@ -83,6 +86,14 @@ public class AppOrderPayment {
 
 	public void setConfirmed(boolean confirmed) {
 		this.confirmed = confirmed;
+	}
+
+	public String getBank() {
+		return bank;
+	}
+
+	public void setBank(String bank) {
+		this.bank = bank;
 	}
 
 	public void setPaidAt(Instant paidAt) {

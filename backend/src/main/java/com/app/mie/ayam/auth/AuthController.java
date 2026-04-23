@@ -18,6 +18,7 @@ import com.app.mie.ayam.auth.dto.RegisterRequest;
 import com.app.mie.ayam.user.AppUserRepository;
 
 import jakarta.validation.Valid;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -45,8 +46,15 @@ public class AuthController {
 
 	@GetMapping("/me")
 	public MeResponse me(Principal principal) {
-		String username = principal.getName();
+		String username = requireUsername(principal);
 		String rolesCsv = appUserRepository.findByUsername(username).orElseThrow().getRolesCsv();
 		return new MeResponse(username, Arrays.stream(rolesCsv.split(",")).map(String::trim).filter(s -> !s.isBlank()).toList());
+	}
+
+	private static String requireUsername(Principal principal) {
+		if (principal == null) {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesi habis. Silakan login lagi.");
+		}
+		return principal.getName();
 	}
 }
