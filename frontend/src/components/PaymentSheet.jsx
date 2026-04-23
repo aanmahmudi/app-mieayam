@@ -1,4 +1,4 @@
-import { rupiah } from '../lib/format'
+import { formatDateTime, rupiah } from '../lib/format'
 
 export function PaymentSheet({
   pendingPayment,
@@ -15,7 +15,7 @@ export function PaymentSheet({
   onPay,
   onCancel,
 }) {
-  if (!pendingPayment) return <div className="payHint">Buat pesanan dulu untuk melakukan pembayaran.</div>
+  if (!pendingPayment) return null
 
   return (
     <div className="payWrap">
@@ -23,7 +23,6 @@ export function PaymentSheet({
         <div className="payLabel">Total</div>
         <div className="payValue">{rupiah.format(lastOrder?.total ?? 0)}</div>
       </div>
-      <div className="payHint">Status: Belum dibayar</div>
       <div className="payMethods">
         <button
           type="button"
@@ -47,11 +46,10 @@ export function PaymentSheet({
         <div className="payCash">
           <div className="label">Pembayaran</div>
           <input className="input" placeholder="Pembayaran di kasir / cash" value="Pembayaran di kasir / cash" readOnly disabled />
-          <div className="payHint">Cash diproses langsung.</div>
           <input type="hidden" value={cashPaid} readOnly />
         </div>
       ) : paymentMethod === 'QRIS' ? (
-        <div className="payHint">QRIS diproses otomatis setelah bayar.</div>
+        null
       ) : (
         <div className="payBank">
           <div className="paySummary">
@@ -64,7 +62,6 @@ export function PaymentSheet({
             <option value="MANDIRI">Mandiri</option>
             <option value="BCA">BCA</option>
           </select>
-          <div className="payHint">Bank langsung lunas.</div>
           <div className="txTitle">Mutasi (terakhir)</div>
           <div className="txList">
             {walletTxs.length ? (
@@ -72,13 +69,17 @@ export function PaymentSheet({
                 <div className="txRow" key={tx.id}>
                   <div className="txLeft">
                     <div className="txType">{tx.type === 'TOP_UP' ? 'Top up' : 'Pembayaran'}</div>
-                    {tx.orderId ? <div className="txMeta">Order #{tx.orderId}</div> : <div className="txMeta">Saldo: {rupiah.format(tx.balanceAfter)}</div>}
+                    {tx.orderId ? (
+                      <div className="txMeta">{formatDateTime(tx.createdAt)}</div>
+                    ) : (
+                      <div className="txMeta">Saldo: {rupiah.format(tx.balanceAfter)}</div>
+                    )}
                   </div>
                   <div className={`txAmount ${tx.amount < 0 ? 'neg' : 'pos'}`}>{rupiah.format(tx.amount)}</div>
                 </div>
               ))
             ) : (
-              <div className="payHint">Belum ada transaksi.</div>
+              null
             )}
           </div>
         </div>
@@ -92,4 +93,3 @@ export function PaymentSheet({
     </div>
   )
 }
-

@@ -2,10 +2,12 @@ package com.app.mie.ayam.config;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -30,6 +32,20 @@ public class SecurityConfig {
 			.csrf(csrf -> csrf.disable())
 			.cors(withDefaults())
 			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.exceptionHandling(eh -> eh
+				.authenticationEntryPoint((request, response, ex) -> {
+					response.setStatus(401);
+					response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+					response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+					response.getWriter().write("{\"message\":\"Sesi habis. Silakan login lagi.\"}");
+				})
+				.accessDeniedHandler((request, response, ex) -> {
+					response.setStatus(403);
+					response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+					response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+					response.getWriter().write("{\"message\":\"Akses ditolak.\"}");
+				})
+			)
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
 				.requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")

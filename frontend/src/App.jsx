@@ -131,7 +131,7 @@ function App() {
     }
   }
 
-  function handleLogout() {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
     setToken('')
     setItems([])
@@ -151,7 +151,19 @@ function App() {
     setIsAdmin(false)
     setSheetMode('order')
     window.history.pushState(null, '', '/login')
-  }
+  }, [])
+
+  const handleAuthError = useCallback(
+    (err) => {
+    const message = err?.message ?? ''
+    if (!message) return false
+      if (!message.includes('Sesi habis')) return false
+    handleLogout()
+    setLoginStatus(message)
+    return true
+    },
+    [handleLogout]
+  )
 
   function goToLogin() {
     window.history.pushState(null, '', '/login')
@@ -191,11 +203,12 @@ function App() {
       const data = await apiFetch('/api/orders/my', { token })
       setOrderHistory(Array.isArray(data) ? data : [])
     } catch (err) {
+      if (handleAuthError(err)) return
       setErrorHistory(err.message)
     } finally {
       setLoadingHistory(false)
     }
-  }, [token])
+  }, [token, handleAuthError])
 
   const loadAdminMenu = useCallback(async () => {
     if (!token) return
@@ -205,26 +218,34 @@ function App() {
       const data = await apiFetch('/api/menu', { token })
       setAdminMenuItems(Array.isArray(data) ? data : [])
     } catch (err) {
+      if (handleAuthError(err)) return
       setErrorAdminMenu(err.message)
       setAdminMenuItems([])
     } finally {
       setLoadingAdminMenu(false)
     }
-  }, [token])
+  }, [token, handleAuthError])
 
   useEffect(() => {
     if (!token) return
     apiFetch('/api/wallet/me', { token })
       .then((d) => setWalletBalance(d?.balance ?? 0))
-      .catch(() => {})
+      .catch((err) => {
+        handleAuthError(err)
+      })
     apiFetch('/api/wallet/transactions?limit=10', { token })
       .then((d) => setWalletTxs(Array.isArray(d) ? d : []))
-      .catch(() => {})
+      .catch((err) => {
+        handleAuthError(err)
+      })
     apiFetch('/api/auth/me', { token })
       .then((d) => setIsAdmin(Array.isArray(d?.roles) && d.roles.includes('ROLE_ADMIN')))
-      .catch(() => setIsAdmin(false))
+      .catch((err) => {
+        if (handleAuthError(err)) return
+        setIsAdmin(false)
+      })
     loadHistory()
-  }, [token, loadHistory])
+  }, [token, loadHistory, handleAuthError])
 
   useEffect(() => {
     if (!token) {
@@ -270,6 +291,7 @@ function App() {
       setCartOpen(true)
       setOrderStatus('Pesanan dibuat. Silakan lakukan pembayaran.')
     } catch (err) {
+      if (handleAuthError(err)) return
       setOrderStatus(err.message)
     } finally {
       setOrdering(false)
@@ -304,6 +326,7 @@ function App() {
       setSheetMode('receipt')
       setCartOpen(true)
     } catch (err) {
+      if (handleAuthError(err)) return
       setOrderStatus(err.message)
     } finally {
       setPaying(false)
@@ -322,6 +345,7 @@ function App() {
       }
       setOrderStatus('Pesanan dibatalkan.')
     } catch (err) {
+      if (handleAuthError(err)) return
       setOrderStatus(err.message)
     }
   }
@@ -357,6 +381,7 @@ function App() {
       setMenuDraft({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })
       loadAdminMenu()
     } catch (err) {
+      if (handleAuthError(err)) return
       setOrderStatus(err.message)
     } finally {
       setSavingMenu(false)
@@ -375,6 +400,7 @@ function App() {
       }
       loadAdminMenu()
     } catch (err) {
+      if (handleAuthError(err)) return
       setOrderStatus(err.message)
     } finally {
       setSavingMenu(false)
