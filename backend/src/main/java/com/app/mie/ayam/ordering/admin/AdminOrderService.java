@@ -1,5 +1,7 @@
 package com.app.mie.ayam.ordering.admin;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.springframework.data.domain.PageRequest;
@@ -12,8 +14,11 @@ import com.app.mie.ayam.ordering.AppOrder;
 import com.app.mie.ayam.ordering.AppOrderPayment;
 import com.app.mie.ayam.ordering.AppOrderPaymentRepository;
 import com.app.mie.ayam.ordering.AppOrderRepository;
+import com.app.mie.ayam.ordering.OrderStatus;
 import com.app.mie.ayam.ordering.PaymentMethod;
+import com.app.mie.ayam.ordering.admin.dto.AdminOrderSummaryResponse;
 import com.app.mie.ayam.ordering.admin.dto.AdminPendingOrderResponse;
+import com.app.mie.ayam.ordering.admin.dto.AdminWeeklyStatsResponse;
 import com.app.mie.ayam.ordering.admin.dto.ConfirmCashPaymentRequest;
 import com.app.mie.ayam.ordering.dto.OrderResponse;
 
@@ -67,5 +72,43 @@ public class AdminOrderService {
 		payment.setConfirmed(true);
 		AppOrderPayment saved = paymentRepository.save(payment);
 		return OrderResponse.from(order, saved);
+	}
+
+	@Transactional(readOnly = true)
+	public List<AdminOrderSummaryResponse> listRecentOrders(int limit) {
+		int safeLimit = Math.max(1, Math.min(200, limit));
+		List<AppOrder> orders = orderRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, safeLimit));
+		return orders.stream()
+			.map(order -> new java.util.AbstractMap.SimpleEntry<>(order, paymentRepository.findByOrderId(order.getId()).orElse(null)))
+			.map(entry -> {
+				AppOrder order = entry.getKey();
+				AppOrderPayment payment = entry.getValue();
+				OrderStatus status = payment != null && payment.isConfirmed() ? OrderStatus.PAID : OrderStatus.CREATED;
+				return new AdminOrderSummaryResponse(
+					order.getId(),
+					order.getUser().getUsername(),
+					order.getCreatedAt(),
+					status,
+					order.getTotal(),
+					payment == null ? null : payment.getMethod(),
+					payment == null ? null : payment.getBank(),
+					payment == null ? null : payment.getPaidAt()
+				);
+			})
+			.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public List<AdminWeeklyStatsResponse> weeklyStats(int weeks) {
+		int safeWeeks = Math.max(1, Math.min(104, weeks));
+		Instant from = Instant.now().minus(safeWeeks * 7L, ChronoUnit.DAYS);
+		return orderRepository.findWeeklyAdminStats(from).stream()
+			.map(row -> new AdminWeeklyStatsResponse(
+				row.getWeekStart().toInstant(),
+				row.getTotalOrders(),
+				row.getPaidOrders(),
+				row.getPaidTotal()
+			))
+			.toList();
 	}
 }

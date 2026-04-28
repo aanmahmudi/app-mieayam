@@ -68,7 +68,7 @@ export function PaymentSheet({
               walletTxs.map((tx) => (
                 <div className="txRow" key={tx.id}>
                   <div className="txLeft">
-                    <div className="txType">{tx.type === 'TOP_UP' ? 'Top up' : 'Pembayaran'}</div>
+                    <div className="txType">{tx.type === 'TOP_UP' ? 'Top up' : tx.type === 'REFUND' ? 'Refund' : 'Pembayaran'}</div>
                     {tx.orderId ? (
                       <div className="txMeta">{formatDateTime(tx.createdAt)}</div>
                     ) : (

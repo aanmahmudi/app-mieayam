@@ -45,6 +45,11 @@ function App() {
   const [errorAdminMenu, setErrorAdminMenu] = useState('')
   const [menuDraft, setMenuDraft] = useState({ id: null, name: '', category: 'MAKANAN', unit: '', price: '', imageUrl: '' })
   const [savingMenu, setSavingMenu] = useState(false)
+  const [adminTab, setAdminTab] = useState('menu')
+  const [adminWeeklyStats, setAdminWeeklyStats] = useState([])
+  const [adminRecentOrders, setAdminRecentOrders] = useState([])
+  const [loadingAdminReport, setLoadingAdminReport] = useState(false)
+  const [errorAdminReport, setErrorAdminReport] = useState('')
 
   const [authRoute, setAuthRoute] = useState(() => getAuthRouteFromLocation())
   const [registerUsername, setRegisterUsername] = useState('')
@@ -153,17 +158,12 @@ function App() {
     window.history.pushState(null, '', '/login')
   }, [])
 
-  const handleAuthError = useCallback(
-    (err) => {
+  const handleAuthError = useCallback((err) => {
     const message = err?.message ?? ''
     if (!message) return false
-      if (!message.includes('Sesi habis')) return false
-    handleLogout()
-    setLoginStatus(message)
+    if (!message.includes('Sesi habis')) return false
     return true
-    },
-    [handleLogout]
-  )
+  }, [])
 
   function goToLogin() {
     window.history.pushState(null, '', '/login')
@@ -185,7 +185,7 @@ function App() {
   const pendingPayment = !!lastOrder && lastOrder.status === 'CREATED'
   const sheetTitle =
     sheetMode === 'admin'
-      ? 'Admin Menu'
+      ? 'Admin'
       : sheetMode === 'payment'
         ? 'Pembayaran'
         : sheetMode === 'receipt'
@@ -223,6 +223,27 @@ function App() {
       setAdminMenuItems([])
     } finally {
       setLoadingAdminMenu(false)
+    }
+  }, [token, handleAuthError])
+
+  const loadAdminReport = useCallback(async () => {
+    if (!token) return
+    setLoadingAdminReport(true)
+    setErrorAdminReport('')
+    try {
+      const [weekly, recent] = await Promise.all([
+        apiFetch('/api/admin/orders/weekly-stats?weeks=12', { token }),
+        apiFetch('/api/admin/orders/recent?limit=60', { token }),
+      ])
+      setAdminWeeklyStats(Array.isArray(weekly) ? weekly : [])
+      setAdminRecentOrders(Array.isArray(recent) ? recent : [])
+    } catch (err) {
+      if (handleAuthError(err)) return
+      setErrorAdminReport(err.message)
+      setAdminWeeklyStats([])
+      setAdminRecentOrders([])
+    } finally {
+      setLoadingAdminReport(false)
     }
   }, [token, handleAuthError])
 
@@ -338,6 +359,7 @@ function App() {
     setOrderStatus('')
     try {
       await apiFetch(`/api/orders/${orderId}/cancel`, { token, method: 'POST' })
+      setOrderHistory((prev) => prev.filter((o) => o?.id !== orderId))
       await loadHistory()
       if (lastOrder?.id === orderId) {
         setLastOrder(null)
@@ -448,11 +470,13 @@ function App() {
                   type="button"
                   onClick={() => {
                     setSheetMode('admin')
+                    setAdminTab('report')
                     setCartOpen(true)
                     loadAdminMenu()
+                    loadAdminReport()
                   }}
                   disabled={loadingAdminMenu}
-                  aria-label="Admin Menu"
+                  aria-label="Admin"
                 >
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path
@@ -628,6 +652,8 @@ function App() {
                   <div className="modalBody">
                     {sheetMode === 'admin' ? (
                       <AdminMenuPanel
+                        adminTab={adminTab}
+                        setAdminTab={setAdminTab}
                         errorAdminMenu={errorAdminMenu}
                         menuDraft={menuDraft}
                         setMenuDraft={setMenuDraft}
@@ -637,6 +663,11 @@ function App() {
                         adminMenuItems={adminMenuItems}
                         loadingAdminMenu={loadingAdminMenu}
                         onDeleteMenuItem={deleteAdminMenuItem}
+                        weeklyStats={adminWeeklyStats}
+                        recentOrders={adminRecentOrders}
+                        loadingReport={loadingAdminReport}
+                        errorReport={errorAdminReport}
+                        onRefreshReport={loadAdminReport}
                       />
                     ) : null}
 

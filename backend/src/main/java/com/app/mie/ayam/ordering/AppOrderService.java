@@ -147,7 +147,10 @@ public class AppOrderService {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order sudah dibayar dan tidak bisa dibatalkan.");
 		}
 		if (payment != null) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Pembayaran sedang diproses.");
+			if (payment.getMethod() == PaymentMethod.BANK) {
+				walletService.refundToBalance(username, order.getTotal(), order.getId());
+			}
+			paymentRepository.delete(payment);
 		}
 
 		orderRepository.delete(order);

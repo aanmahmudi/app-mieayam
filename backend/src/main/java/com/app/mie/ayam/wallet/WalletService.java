@@ -114,6 +114,30 @@ public class WalletService {
 	}
 
 	@Transactional
+	public WalletTransaction refundToBalance(String username, int amount, Long orderId) {
+		if (amount <= 0) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nominal refund tidak valid.");
+		}
+
+		WalletAccount account = getOrCreateAccount(username);
+		int before = account.getBalance();
+		int after = before + amount;
+		account.setBalance(after);
+		accountRepository.save(account);
+
+		WalletTransaction tx = new WalletTransaction(
+			account,
+			WalletTransactionType.REFUND,
+			amount,
+			before,
+			after,
+			orderId,
+			Instant.now()
+		);
+		return transactionRepository.save(tx);
+	}
+
+	@Transactional
 	public List<WalletTransaction> listTransactions(String username, int limit) {
 		WalletAccount account = getOrCreateAccount(username);
 		int safeLimit = Math.max(1, Math.min(50, limit));

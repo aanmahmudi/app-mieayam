@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.app.mie.ayam.ordering.admin.dto.AdminOrderSummaryResponse;
 import com.app.mie.ayam.ordering.admin.dto.AdminPendingOrderResponse;
+import com.app.mie.ayam.ordering.admin.dto.AdminWeeklyStatsResponse;
 import com.app.mie.ayam.ordering.admin.dto.ConfirmCashPaymentRequest;
 import com.app.mie.ayam.ordering.dto.OrderResponse;
 
@@ -29,6 +31,16 @@ public class AdminOrderController {
 	@GetMapping("/pending")
 	public List<AdminPendingOrderResponse> pending(@RequestParam(defaultValue = "30") int limit) {
 		return adminOrderService.listPendingOrders(limit);
+	}
+
+	@GetMapping("/recent")
+	public List<AdminOrderSummaryResponse> recent(@RequestParam(defaultValue = "50") int limit) {
+		return adminOrderService.listRecentOrders(limit);
+	}
+
+	@GetMapping("/weekly-stats")
+	public List<AdminWeeklyStatsResponse> weeklyStats(@RequestParam(defaultValue = "12") int weeks) {
+		return adminOrderService.weeklyStats(weeks);
 	}
 
 	@PostMapping("/{orderId}/confirm")

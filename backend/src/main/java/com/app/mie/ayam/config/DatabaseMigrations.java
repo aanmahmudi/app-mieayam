@@ -40,6 +40,16 @@ public class DatabaseMigrations implements ApplicationRunner {
 			);
 		} catch (RuntimeException ignored) {
 		}
+		try {
+			jdbc.execute("ALTER TABLE wallet_transaction DROP CONSTRAINT IF EXISTS wallet_transaction_type_check");
+		} catch (RuntimeException ignored) {
+		}
+		try {
+			jdbc.execute(
+				"ALTER TABLE wallet_transaction ADD CONSTRAINT wallet_transaction_type_check CHECK (type IN ('TOP_UP','PAYMENT','REFUND'))"
+			);
+		} catch (RuntimeException ignored) {
+		}
 	}
 
 	private String getDatabaseProductName() {
@@ -51,4 +61,3 @@ public class DatabaseMigrations implements ApplicationRunner {
 		}
 	}
 }
-
