@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { AuthCard } from './components/AuthCard.jsx'
 import { AdminMenuPanel } from './components/AdminMenuPanel.jsx'
@@ -50,6 +50,8 @@ function App() {
   const [adminRecentOrders, setAdminRecentOrders] = useState([])
   const [loadingAdminReport, setLoadingAdminReport] = useState(false)
   const [errorAdminReport, setErrorAdminReport] = useState('')
+  const [adminReportFromDate, setAdminReportFromDate] = useState('')
+  const [adminReportToDate, setAdminReportToDate] = useState('')
 
   const [authRoute, setAuthRoute] = useState(() => getAuthRouteFromLocation())
   const [registerUsername, setRegisterUsername] = useState('')
@@ -59,6 +61,25 @@ function App() {
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginStatus, setLoginStatus] = useState('')
+  const modalRef = useRef(null)
+
+  const scrollModalToTopSoon = useCallback(() => {
+    window.scrollTo(0, 0)
+    document.body.scrollTop = 0
+    document.documentElement.scrollTop = 0
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = modalRef.current
+        if (!el) return
+        el.scrollTop = 0
+      })
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!cartOpen) return
+    scrollModalToTopSoon()
+  }, [cartOpen, sheetMode, scrollModalToTopSoon])
 
   useEffect(() => {
     normalizeLegacyHashRoute()
@@ -126,9 +147,14 @@ function App() {
       const newToken = data?.token ?? ''
       localStorage.setItem(TOKEN_KEY, newToken)
       setToken(newToken)
+      setActiveCategory('MAKANAN')
       setLoginUsername('')
       setLoginPassword('')
       window.history.pushState(null, '', '/')
+      setSheetMode('order')
+      setCartOpen(false)
+      setCart({})
+      setLastOrder(null)
       setOrderHistory([])
       setErrorHistory('')
     } catch (err) {
@@ -139,6 +165,7 @@ function App() {
   const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
     setToken('')
+    setActiveCategory('MAKANAN')
     setItems([])
     setErrorMenu('')
     setCart({})
@@ -226,14 +253,20 @@ function App() {
     }
   }, [token, handleAuthError])
 
-  const loadAdminReport = useCallback(async () => {
+  const loadAdminReport = useCallback(async (params) => {
     if (!token) return
+    const fromDate = params?.fromDate ?? adminReportFromDate
+    const toDate = params?.toDate ?? adminReportToDate
     setLoadingAdminReport(true)
     setErrorAdminReport('')
     try {
+      const qsDate =
+        fromDate || toDate
+          ? `&fromDate=${encodeURIComponent(fromDate || '')}&toDate=${encodeURIComponent(toDate || '')}`
+          : ''
       const [weekly, recent] = await Promise.all([
-        apiFetch('/api/admin/orders/weekly-stats?weeks=12', { token }),
-        apiFetch('/api/admin/orders/recent?limit=60', { token }),
+        apiFetch(fromDate || toDate ? `/api/admin/orders/weekly-stats?weeks=12${qsDate}` : '/api/admin/orders/weekly-stats?weeks=12', { token }),
+        apiFetch(`/api/admin/orders/recent?limit=60${qsDate}`, { token }),
       ])
       setAdminWeeklyStats(Array.isArray(weekly) ? weekly : [])
       setAdminRecentOrders(Array.isArray(recent) ? recent : [])
@@ -245,7 +278,7 @@ function App() {
     } finally {
       setLoadingAdminReport(false)
     }
-  }, [token, handleAuthError])
+  }, [token, handleAuthError, adminReportFromDate, adminReportToDate])
 
   useEffect(() => {
     if (!token) return
@@ -310,6 +343,7 @@ function App() {
       setCashPaid('')
       setSheetMode('payment')
       setCartOpen(true)
+      scrollModalToTopSoon()
       setOrderStatus('Pesanan dibuat. Silakan lakukan pembayaran.')
     } catch (err) {
       if (handleAuthError(err)) return
@@ -560,8 +594,9 @@ function App() {
                   className="button primary"
                   type="button"
                   onClick={() => {
-                    setSheetMode('order')
                     setCartOpen(true)
+                    setSheetMode('order')
+                    scrollModalToTopSoon()
                   }}
                 >
                   Checkout
@@ -583,6 +618,7 @@ function App() {
                   onClick={() => {
                     setSheetMode('payment')
                     setCartOpen(true)
+                    scrollModalToTopSoon()
                   }}
                 >
                   Bayar
@@ -602,6 +638,7 @@ function App() {
                   onClick={() => {
                     setSheetMode('receipt')
                     setCartOpen(true)
+                    scrollModalToTopSoon()
                   }}
                 >
                   Lihat
@@ -613,29 +650,31 @@ function App() {
           {cartOpen ? (
             <>
               <div className="modalBackdrop" onClick={() => setCartOpen(false)} />
-              <div className="modalWrap">
-                <div className="modalCard">
-                  <div className="modalHeader">
-                    <div>
-                      <div className="modalTitle">{sheetTitle}</div>
-                      {sheetMode === 'order' ? (
-                        <div className="modalMeta">
-                          {cartCount} item • {rupiah.format(cartTotal)}
-                        </div>
-                      ) : null}
+              <div className="modalWrap top">
+                  <div ref={modalRef} className={`modalCard ${sheetMode === 'history' || sheetMode === 'admin' ? 'tall' : ''}`}>
+                  {sheetMode !== 'history' ? (
+                    <div className="modalHeader">
+                      <div>
+                        <div className="modalTitle">{sheetTitle}</div>
+                        {sheetMode === 'order' ? (
+                          <div className="modalMeta">
+                            {cartCount} item • {rupiah.format(cartTotal)}
+                          </div>
+                        ) : null}
+                      </div>
+                      <button className="iconButton" type="button" onClick={() => setCartOpen(false)} aria-label="Tutup">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path
+                            d="M18 6L6 18M6 6l12 12"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                    <button className="iconButton" type="button" onClick={() => setCartOpen(false)} aria-label="Tutup">
-                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path
-                          d="M18 6L6 18M6 6l12 12"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                  </div>
+                  ) : null}
 
                   {sheetMode !== 'history' && sheetMode !== 'admin' ? (
                     <Stepper
@@ -643,9 +682,18 @@ function App() {
                       canGoOrder={cartCount || lastOrder}
                       canGoPayment={pendingPayment || lastOrder}
                       canGoReceipt={lastOrder}
-                      onGoOrder={() => setSheetMode('order')}
-                      onGoPayment={() => setSheetMode('payment')}
-                      onGoReceipt={() => setSheetMode('receipt')}
+                      onGoOrder={() => {
+                        setSheetMode('order')
+                        scrollModalToTopSoon()
+                      }}
+                      onGoPayment={() => {
+                        setSheetMode('payment')
+                        scrollModalToTopSoon()
+                      }}
+                      onGoReceipt={() => {
+                        setSheetMode('receipt')
+                        scrollModalToTopSoon()
+                      }}
                     />
                   ) : null}
 
@@ -667,6 +715,10 @@ function App() {
                         recentOrders={adminRecentOrders}
                         loadingReport={loadingAdminReport}
                         errorReport={errorAdminReport}
+                        reportFromDate={adminReportFromDate}
+                        setReportFromDate={setAdminReportFromDate}
+                        reportToDate={adminReportToDate}
+                        setReportToDate={setAdminReportToDate}
                         onRefreshReport={loadAdminReport}
                       />
                     ) : null}
@@ -679,7 +731,10 @@ function App() {
                         onSetQuantity={setCartItemQuantity}
                         onSubmitOrder={submitOrder}
                         lastOrder={lastOrder}
-                        onGoToPayment={() => setSheetMode('payment')}
+                        onGoToPayment={() => {
+                          setSheetMode('payment')
+                          scrollModalToTopSoon()
+                        }}
                       />
                     ) : null}
 
@@ -693,7 +748,6 @@ function App() {
                         setCashPaid={setCashPaid}
                         paying={paying}
                         walletBalance={walletBalance}
-                        walletTxs={walletTxs}
                         bankChoice={bankChoice}
                         setBankChoice={setBankChoice}
                         onPay={payOrder}
@@ -719,6 +773,7 @@ function App() {
                         loadingHistory={loadingHistory}
                         errorHistory={errorHistory}
                         onRefresh={loadHistory}
+                        onClose={() => setCartOpen(false)}
                         onSelectOrder={(o) => {
                           setLastOrder(o)
                           setSheetMode(o.status === 'PAID' ? 'receipt' : 'payment')

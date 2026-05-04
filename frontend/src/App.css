@@ -523,6 +523,12 @@
   pointer-events: none;
 }
 
+.modalWrap.top {
+  align-items: flex-start;
+  --modalTopOffset: calc(92px + env(safe-area-inset-top));
+  padding-top: var(--modalTopOffset);
+}
+
 .modalCard {
   pointer-events: auto;
   width: min(460px, 100%);
@@ -533,6 +539,15 @@
   background: rgba(255, 255, 255, 0.86);
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
+}
+
+.modalCard.tall {
+  min-height: min(82vh, 780px);
+  max-height: min(92vh, 900px);
+}
+
+.modalWrap.top .modalCard.tall {
+  height: min(calc(100dvh - var(--modalTopOffset) - 12px), 900px);
 }
 
 .modalHeader {
@@ -620,6 +635,43 @@
 
 .modalBody {
   padding: 12px 14px 14px;
+}
+
+.sheetHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modalCard.tall .modalBody {
+  padding: 10px 12px 12px;
+}
+
+.history .receiptHeader {
+  padding-bottom: 8px;
+}
+
+.historyList {
+  gap: 10px;
+  margin-top: 8px;
+  max-height: 340px;
+}
+
+.historyCard {
+  padding: 10px;
+}
+
+.historyMid {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.historyActions {
+  margin-top: 10px;
+}
+
+.modalCard.tall .historyList {
+  max-height: 56vh;
 }
 
 .cartBackdrop {
@@ -923,6 +975,212 @@
 
 .adminPanel {
   margin-top: 10px;
+}
+
+.adminToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.adminSegment {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.adminSegBtn {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.adminSegBtn:hover {
+  transform: translateY(-1px);
+}
+
+.adminSegBtn.active {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(79, 70, 229, 0.98) 100%);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+  transform: none;
+}
+
+.adminToolbarBtn {
+  white-space: nowrap;
+}
+
+.adminSectionTitle {
+  margin-top: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.adminFilterRow {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.adminFilterLabel {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.adminFilterActions {
+  grid-column: 1 / 3;
+  display: flex;
+  gap: 10px;
+}
+
+.adminFilterActions .button {
+  flex: 1;
+}
+
+.adminHint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.adminStatList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.adminStatCard {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 0 rgba(2, 6, 23, 0.04);
+}
+
+.adminStatTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adminStatTitle {
+  min-width: 0;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminStatAmount {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.adminStatMeta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.adminRecentList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.adminRecentRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  gap: 3px 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 0 rgba(2, 6, 23, 0.04);
+}
+
+.adminRecentUser {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminRecentBadge {
+  justify-self: end;
+  align-self: start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.adminRecentBadge.paid {
+  background: rgba(22, 101, 52, 0.08);
+  border-color: rgba(22, 101, 52, 0.2);
+  color: #166534;
+}
+
+.adminRecentBadge.pending {
+  background: rgba(180, 83, 9, 0.08);
+  border-color: rgba(180, 83, 9, 0.22);
+  color: #b45309;
+}
+
+.adminRecentMeta {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminRecentTotal {
+  justify-self: end;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.adminRecentPay {
+  grid-column: 1 / 3;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adminPanel .historyList,
+.adminPanel .adminMenuList {
+  max-height: none;
+  overflow: visible;
 }
 
 .adminTabs {

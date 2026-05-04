@@ -3,7 +3,6 @@ package com.app.mie.ayam.wallet;
 import java.time.Instant;
 import java.util.List;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,26 +33,18 @@ public class WalletService {
 
 	@Transactional
 	public WalletAccount getOrCreateAccount(String username) {
-		return accountRepository.findByUserUsername(username).map(existing -> {
+		AppUser user = userRepository.findByUsernameForUpdate(username).orElseThrow();
+		WalletAccount existing = accountRepository.findByUserUsername(username).orElse(null);
+		if (existing != null) {
 			if (existing.getBalance() == 0) {
 				existing.setBalance(DUMMY_INITIAL_BALANCE);
 				return accountRepository.save(existing);
 			}
 			return existing;
-		}).orElseGet(() -> {
-			AppUser user = userRepository.findByUsername(username).orElseThrow();
-			try {
-				WalletAccount created = new WalletAccount(user, DUMMY_INITIAL_BALANCE, Instant.now());
-				return accountRepository.save(created);
-			} catch (DataIntegrityViolationException ex) {
-				WalletAccount existing = accountRepository.findByUserUsername(username).orElseThrow(() -> ex);
-				if (existing.getBalance() == 0) {
-					existing.setBalance(DUMMY_INITIAL_BALANCE);
-					return accountRepository.save(existing);
-				}
-				return existing;
-			}
-		});
+		}
+
+		WalletAccount created = new WalletAccount(user, DUMMY_INITIAL_BALANCE, Instant.now());
+		return accountRepository.save(created);
 	}
 
 	@Transactional

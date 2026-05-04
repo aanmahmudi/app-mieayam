@@ -1,4 +1,4 @@
-import { formatDateTime, rupiah } from '../lib/format'
+import { rupiah } from '../lib/format'
 
 export function PaymentSheet({
   pendingPayment,
@@ -9,13 +9,14 @@ export function PaymentSheet({
   setCashPaid,
   paying,
   walletBalance,
-  walletTxs,
   bankChoice,
   setBankChoice,
   onPay,
   onCancel,
 }) {
-  if (!pendingPayment) return null
+  if (!pendingPayment) {
+    return <div className="payHint">Memproses...</div>
+  }
 
   return (
     <div className="payWrap">
@@ -23,6 +24,22 @@ export function PaymentSheet({
         <div className="payLabel">Total</div>
         <div className="payValue">{rupiah.format(lastOrder?.total ?? 0)}</div>
       </div>
+      {(lastOrder?.items?.length ?? 0) ? (
+        <div className="payOrderDetails">
+          <div className="label">Rincian Pesanan</div>
+          <div className="receiptItems">
+            {(lastOrder.items ?? []).map((it) => (
+              <div className="receiptItemRow" key={it.menuItemId}>
+                <div className="receiptItemName">{it.name}</div>
+                <div className="receiptItemQty">
+                  {it.quantity} x {rupiah.format(it.priceEach)}
+                </div>
+                <div className="receiptItemSub">{rupiah.format(it.subtotal)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="payMethods">
         <button
           type="button"
@@ -62,26 +79,6 @@ export function PaymentSheet({
             <option value="MANDIRI">Mandiri</option>
             <option value="BCA">BCA</option>
           </select>
-          <div className="txTitle">Mutasi (terakhir)</div>
-          <div className="txList">
-            {walletTxs.length ? (
-              walletTxs.map((tx) => (
-                <div className="txRow" key={tx.id}>
-                  <div className="txLeft">
-                    <div className="txType">{tx.type === 'TOP_UP' ? 'Top up' : tx.type === 'REFUND' ? 'Refund' : 'Pembayaran'}</div>
-                    {tx.orderId ? (
-                      <div className="txMeta">{formatDateTime(tx.createdAt)}</div>
-                    ) : (
-                      <div className="txMeta">Saldo: {rupiah.format(tx.balanceAfter)}</div>
-                    )}
-                  </div>
-                  <div className={`txAmount ${tx.amount < 0 ? 'neg' : 'pos'}`}>{rupiah.format(tx.amount)}</div>
-                </div>
-              ))
-            ) : (
-              null
-            )}
-          </div>
         </div>
       )}
       <button className="button primary cartSubmit" type="button" onClick={onPay} disabled={paying || (paymentMethod === 'BANK' && walletBalance < (lastOrder?.total ?? 0))}>

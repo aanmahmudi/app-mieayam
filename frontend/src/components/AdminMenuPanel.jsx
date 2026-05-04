@@ -16,6 +16,10 @@ export function AdminMenuPanel({
   recentOrders,
   loadingReport,
   errorReport,
+  reportFromDate,
+  setReportFromDate,
+  reportToDate,
+  setReportToDate,
   onRefreshReport,
 }) {
   const formatDateOnly = (value) => {
@@ -33,12 +37,25 @@ export function AdminMenuPanel({
     return `${formatDateOnly(start)} – ${formatDateOnly(end)}`
   }
 
+  const paymentLabel = (o) => {
+    if (!o?.paymentMethod) return ''
+    if (o.paymentMethod === 'BANK' && o.bank) return `${o.paymentMethod} • ${o.bank}`
+    return String(o.paymentMethod)
+  }
+
   return (
     <div className="adminPanel">
-      <div className="receiptHeader">
-        <div className="receiptTitle">Admin</div>
+      <div className="adminToolbar">
+        <div className="adminSegment">
+          <button type="button" className={`adminSegBtn ${adminTab === 'report' ? 'active' : ''}`} onClick={() => setAdminTab('report')}>
+            Laporan
+          </button>
+          <button type="button" className={`adminSegBtn ${adminTab === 'menu' ? 'active' : ''}`} onClick={() => setAdminTab('menu')}>
+            Menu
+          </button>
+        </div>
         <button
-          className="button"
+          className="button adminToolbarBtn"
           type="button"
           onClick={adminTab === 'menu' ? onRefreshMenu : onRefreshReport}
           disabled={adminTab === 'menu' ? loadingAdminMenu : loadingReport}
@@ -46,60 +63,66 @@ export function AdminMenuPanel({
           {adminTab === 'menu' ? (loadingAdminMenu ? 'Memuat...' : 'Refresh') : loadingReport ? 'Memuat...' : 'Refresh'}
         </button>
       </div>
-      <div className="payMethods">
-        <button type="button" className={`payMethodBtn ${adminTab === 'report' ? 'active' : ''}`} onClick={() => setAdminTab('report')}>
-          Laporan
-        </button>
-        <button type="button" className={`payMethodBtn ${adminTab === 'menu' ? 'active' : ''}`} onClick={() => setAdminTab('menu')}>
-          Menu
-        </button>
-      </div>
 
       {adminTab === 'report' ? (
         <>
           {errorReport ? <div className="status error">{errorReport}</div> : null}
 
-          <div className="label">Ringkasan Mingguan</div>
-          {loadingReport ? <div className="payHint">Memuat...</div> : null}
-          {!loadingReport && !weeklyStats?.length ? <div className="payHint">Belum ada data.</div> : null}
-          <div className="historyList">
+          <div className="adminFilterRow">
+            <div className="adminFilterField">
+              <div className="adminFilterLabel">Dari</div>
+              <input className="input" type="date" value={reportFromDate} onChange={(e) => setReportFromDate(e.target.value)} />
+            </div>
+            <div className="adminFilterField">
+              <div className="adminFilterLabel">Sampai</div>
+              <input className="input" type="date" value={reportToDate} onChange={(e) => setReportToDate(e.target.value)} />
+            </div>
+            <div className="adminFilterActions">
+              <button className="button primary" type="button" onClick={() => onRefreshReport({ fromDate: reportFromDate, toDate: reportToDate })} disabled={loadingReport}>
+                Cari
+              </button>
+              <button
+                className="button"
+                type="button"
+                onClick={() => {
+                  setReportFromDate('')
+                  setReportToDate('')
+                  onRefreshReport({ fromDate: '', toDate: '' })
+                }}
+                disabled={loadingReport}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="adminSectionTitle">Ringkasan Mingguan</div>
+          {loadingReport ? <div className="adminHint">Memuat...</div> : null}
+          {!loadingReport && !weeklyStats?.length ? <div className="adminHint">Belum ada data.</div> : null}
+          <div className="adminStatList">
             {(weeklyStats ?? []).map((w) => (
-              <div className="historyCard" key={w.weekStart}>
-                <div className="historyTop">
-                  <div className="historyTopLeft">
-                    <div className="historyOrderId">{weekRangeLabel(w.weekStart)}</div>
-                    <div className="historyWhen">{formatDateTime(w.weekStart)}</div>
-                  </div>
+              <div className="adminStatCard" key={w.weekStart}>
+                <div className="adminStatTop">
+                  <div className="adminStatTitle">{weekRangeLabel(w.weekStart)}</div>
+                  <div className="adminStatAmount">{rupiah.format(w.paidTotal ?? 0)}</div>
                 </div>
-                <div className="historyMid">
-                  <div className="historyAmount">{rupiah.format(w.paidTotal ?? 0)}</div>
-                  <div className="historyMetaLine">
-                    {w.totalOrders ?? 0} pesanan • {w.paidOrders ?? 0} lunas
-                  </div>
+                <div className="adminStatMeta">
+                  {w.totalOrders ?? 0} pesanan • {w.paidOrders ?? 0} lunas
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="label">Pesanan Terbaru</div>
-          {!loadingReport && !recentOrders?.length ? <div className="payHint">Belum ada pesanan.</div> : null}
-          <div className="historyList">
+          <div className="adminSectionTitle">Pesanan Terbaru</div>
+          {!loadingReport && !recentOrders?.length ? <div className="adminHint">Belum ada pesanan.</div> : null}
+          <div className="adminRecentList">
             {(recentOrders ?? []).slice(0, 30).map((o) => (
-              <div className="historyCard" key={o.id ?? String(o.createdAt) + (o.username ?? '')}>
-                <div className="historyTop">
-                  <div className="historyTopLeft">
-                    <div className="historyOrderId">{o.username ?? 'User'}</div>
-                    <div className="historyWhen">{formatDateTime(o.createdAt)}</div>
-                  </div>
-                  <div className={`historyBadge ${o.status === 'PAID' ? 'paid' : 'pending'}`}>{o.status === 'PAID' ? 'Lunas' : 'Belum dibayar'}</div>
-                </div>
-                <div className="historyMid">
-                  <div className="historyAmount">{rupiah.format(o.total ?? 0)}</div>
-                  <div className="historyMetaLine">
-                    {o.paymentMethod ? o.paymentMethod : ''}
-                    {o.paymentMethod === 'BANK' && o.bank ? ` • ${o.bank}` : ''}
-                  </div>
-                </div>
+              <div className="adminRecentRow" key={o.id ?? String(o.createdAt) + (o.username ?? '')}>
+                <div className="adminRecentUser">{o.username ?? 'User'}</div>
+                <div className={`adminRecentBadge ${o.status === 'PAID' ? 'paid' : 'pending'}`}>{o.status === 'PAID' ? 'Lunas' : 'Belum dibayar'}</div>
+                <div className="adminRecentMeta">{formatDateTime(o.createdAt)}</div>
+                <div className="adminRecentTotal">{rupiah.format(o.total ?? 0)}</div>
+                <div className="adminRecentPay">{paymentLabel(o)}</div>
               </div>
             ))}
           </div>
