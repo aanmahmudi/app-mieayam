@@ -39,7 +39,7 @@ export function HistorySheet({ orderHistory, loadingHistory, errorHistory, onRef
                 {o.status === 'PAID' ? 'Lihat Struk' : 'Bayar'}
               </button>
               {o.status !== 'PAID' ? (
-                <button className="button" type="button" onClick={() => onCancelOrder(o.id)}>
+                <button className="button danger" type="button" onClick={() => onCancelOrder(o.id)}>
                   Batalkan
                 </button>
               ) : null}

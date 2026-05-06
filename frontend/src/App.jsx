@@ -33,7 +33,7 @@ function App() {
   const [cashPaid, setCashPaid] = useState('')
   const [paying, setPaying] = useState(false)
   const [walletBalance, setWalletBalance] = useState(0)
-  const [walletTxs, setWalletTxs] = useState([])
+  const [_walletTxs, setWalletTxs] = useState([])
   const [sheetMode, setSheetMode] = useState('order')
   const [orderHistory, setOrderHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)

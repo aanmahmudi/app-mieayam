@@ -1,10 +1,13 @@
 /README_CODE.md
+/README_DEVELOPER.md
 /backend/src/main/resources/application.yaml
 /backend/src/main/resources/application*.yml
 /backend/src/main/resources/application*.yaml
 /backend/src/main/resources/application*.properties
 /.env
 /.env.*
+/backend/.env
+/backend/.env.*
 /frontend/.env
 /frontend/.env.*
 

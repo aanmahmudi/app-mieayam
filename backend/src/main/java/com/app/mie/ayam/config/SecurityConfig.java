@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -62,8 +63,12 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	public CorsConfigurationSource corsConfigurationSource(AppCorsProperties properties) {
+	public CorsConfigurationSource corsConfigurationSource(AppCorsProperties properties, Environment environment) {
 		List<String> allowedOrigins = properties.allowedOrigins();
+		boolean prod = isProd(environment);
+		if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+			allowedOrigins = List.of("*");
+		}
 		CorsConfiguration config = new CorsConfiguration();
 		config.setAllowedOriginPatterns(allowedOrigins);
 		config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -72,5 +77,15 @@ public class SecurityConfig {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", config);
 		return source;
+	}
+
+	private static boolean isProd(Environment environment) {
+		for (String p : environment.getActiveProfiles()) {
+			if ("prod".equalsIgnoreCase(p) || "production".equalsIgnoreCase(p)) return true;
+		}
+		String env = environment.getProperty("APP_ENV");
+		if (env == null || env.isBlank()) env = environment.getProperty("app.env");
+		if (env == null || env.isBlank()) env = System.getenv("APP_ENV");
+		return env != null && (env.equalsIgnoreCase("prod") || env.equalsIgnoreCase("production"));
 	}
 }

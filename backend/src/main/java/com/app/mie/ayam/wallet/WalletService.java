@@ -3,6 +3,7 @@ package com.app.mie.ayam.wallet;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import com.app.mie.ayam.user.AppUserRepository;
 public class WalletService {
 
 	private static final int DUMMY_INITIAL_BALANCE = 50_000_000;
+	private final boolean devMode;
 
 	private final WalletAccountRepository accountRepository;
 	private final WalletTransactionRepository transactionRepository;
@@ -24,11 +26,13 @@ public class WalletService {
 	public WalletService(
 		WalletAccountRepository accountRepository,
 		WalletTransactionRepository transactionRepository,
-		AppUserRepository userRepository
+		AppUserRepository userRepository,
+		Environment environment
 	) {
 		this.accountRepository = accountRepository;
 		this.transactionRepository = transactionRepository;
 		this.userRepository = userRepository;
+		this.devMode = !isProd(environment);
 	}
 
 	@Transactional
@@ -36,14 +40,15 @@ public class WalletService {
 		AppUser user = userRepository.findByUsernameForUpdate(username).orElseThrow();
 		WalletAccount existing = accountRepository.findByUserUsername(username).orElse(null);
 		if (existing != null) {
-			if (existing.getBalance() == 0) {
+			if (devMode && existing.getBalance() == 0) {
 				existing.setBalance(DUMMY_INITIAL_BALANCE);
 				return accountRepository.save(existing);
 			}
 			return existing;
 		}
 
-		WalletAccount created = new WalletAccount(user, DUMMY_INITIAL_BALANCE, Instant.now());
+		int initialBalance = devMode ? DUMMY_INITIAL_BALANCE : 0;
+		WalletAccount created = new WalletAccount(user, initialBalance, Instant.now());
 		return accountRepository.save(created);
 	}
 
@@ -133,5 +138,15 @@ public class WalletService {
 		WalletAccount account = getOrCreateAccount(username);
 		int safeLimit = Math.max(1, Math.min(50, limit));
 		return transactionRepository.findAllByAccountIdOrderByCreatedAtDesc(account.getId(), PageRequest.of(0, safeLimit));
+	}
+
+	private static boolean isProd(Environment environment) {
+		for (String p : environment.getActiveProfiles()) {
+			if ("prod".equalsIgnoreCase(p) || "production".equalsIgnoreCase(p)) return true;
+		}
+		String env = environment.getProperty("APP_ENV");
+		if (env == null || env.isBlank()) env = environment.getProperty("app.env");
+		if (env == null || env.isBlank()) env = System.getenv("APP_ENV");
+		return env != null && (env.equalsIgnoreCase("prod") || env.equalsIgnoreCase("production"));
 	}
 }

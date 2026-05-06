@@ -203,6 +203,25 @@
   color: #ffffff;
 }
 
+.button.danger {
+  border-color: rgba(185, 28, 28, 0.28);
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.button.danger:hover {
+  border-color: rgba(185, 28, 28, 0.42);
+  background: rgba(185, 28, 28, 0.12);
+}
+
+.button.danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .status {
   margin-top: 6px;
   font-size: 13px;
