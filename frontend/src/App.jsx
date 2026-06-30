@@ -16,6 +16,7 @@ import { MakananMenu } from './menu/MakananMenu.jsx'
 import { MinumanMenu } from './menu/MinumanMenu.jsx'
 
 const TOKEN_KEY = 'mieayam_token'
+const USERNAME_KEY = 'mieayam_username'
 
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '')
@@ -39,6 +40,7 @@ function App() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [errorHistory, setErrorHistory] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [currentUsername, setCurrentUsername] = useState(() => localStorage.getItem(USERNAME_KEY) ?? '')
   const [bankChoice, setBankChoice] = useState('BRI')
   const [adminMenuItems, setAdminMenuItems] = useState([])
   const [loadingAdminMenu, setLoadingAdminMenu] = useState(false)
@@ -146,7 +148,9 @@ function App() {
       })
       const newToken = data?.token ?? ''
       localStorage.setItem(TOKEN_KEY, newToken)
+      localStorage.setItem(USERNAME_KEY, loginUsername)
       setToken(newToken)
+      setCurrentUsername(loginUsername)
       setActiveCategory('MAKANAN')
       setLoginUsername('')
       setLoginPassword('')
@@ -164,6 +168,7 @@ function App() {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USERNAME_KEY)
     setToken('')
     setActiveCategory('MAKANAN')
     setItems([])
@@ -181,6 +186,7 @@ function App() {
     setWalletBalance(0)
     setWalletTxs([])
     setIsAdmin(false)
+    setCurrentUsername('')
     setSheetMode('order')
     window.history.pushState(null, '', '/login')
   }, [])
@@ -293,10 +299,17 @@ function App() {
         handleAuthError(err)
       })
     apiFetch('/api/auth/me', { token })
-      .then((d) => setIsAdmin(Array.isArray(d?.roles) && d.roles.includes('ROLE_ADMIN')))
+      .then((d) => {
+        setIsAdmin(Array.isArray(d?.roles) && d.roles.includes('ROLE_ADMIN'))
+        const username = d?.username ?? ''
+        setCurrentUsername(username)
+        if (username) localStorage.setItem(USERNAME_KEY, username)
+      })
       .catch((err) => {
         if (handleAuthError(err)) return
         setIsAdmin(false)
+        setCurrentUsername('')
+        localStorage.removeItem(USERNAME_KEY)
       })
     loadHistory()
   }, [token, loadHistory, handleAuthError])
@@ -307,6 +320,8 @@ function App() {
       setWalletTxs([])
       setWalletBalance(0)
       setIsAdmin(false)
+      setCurrentUsername('')
+      localStorage.removeItem(USERNAME_KEY)
       if (sheetMode === 'admin') setSheetMode('order')
     }
   }, [token, sheetMode])
@@ -757,6 +772,8 @@ function App() {
 
                     {sheetMode === 'receipt' ? (
                       <ReceiptSheet
+                        token={token}
+                        currentUsername={currentUsername}
                         lastOrder={lastOrder}
                         paymentMethod={paymentMethod}
                         onDone={async () => {

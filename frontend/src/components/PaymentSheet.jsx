@@ -84,7 +84,7 @@ export function PaymentSheet({
       <button className="button primary cartSubmit" type="button" onClick={onPay} disabled={paying || (paymentMethod === 'BANK' && walletBalance < (lastOrder?.total ?? 0))}>
         {paying ? 'Memproses...' : 'Bayar'}
       </button>
-      <button className="button danger" type="button" onClick={onCancel} disabled={paying}>
+      <button className="button danger payCancel" type="button" onClick={onCancel} disabled={paying}>
         Batalkan Pesanan
       </button>
     </div>

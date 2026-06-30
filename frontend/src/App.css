@@ -872,6 +872,26 @@
   gap: 8px;
 }
 
+.receiptShare {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(2, 6, 23, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receiptShareTitle {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.receiptShareHint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .receiptTotalRow {
   display: flex;
   align-items: baseline;
@@ -1463,6 +1483,10 @@
 }
 
 .payBank {
+  margin-top: 10px;
+}
+
+.payCancel {
   margin-top: 10px;
 }
 
