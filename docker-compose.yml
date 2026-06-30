@@ -4,13 +4,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: db-mieayam
-      POSTGRES_USER: subrutin
-      POSTGRES_PASSWORD: subrutin
+      POSTGRES_DB: ${POSTGRES_DB:-db-mieayam}
+      POSTGRES_USER: ${POSTGRES_USER:-subrutin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-subrutin}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
 
   backend:
     build:
@@ -18,18 +18,20 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       UPLOADS_DIR: /data/uploads
-      APP_ENV: dev
-      SPRING_MAIL_HOST: smtp.gmail.com
-      SPRING_MAIL_PORT: 587
-      SPRING_MAIL_USERNAME: mahmudiaan88@gmail.com
-      SPRING_MAIL_PASSWORD: berurlcbwxtybdan
-      APP_MAIL_FROM: mahmudiaan88@gmail.com
-      APP_WHATSAPP_TOKEN: ${APP_WHATSAPP_TOKEN}
-      APP_WHATSAPP_PHONE_NUMBER_ID: ${APP_WHATSAPP_PHONE_NUMBER_ID}
+      APP_ENV: ${APP_ENV:-dev}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-true}
+      SPRING_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:-true}
+      APP_MAIL_FROM: ${APP_MAIL_FROM:-}
+      APP_WHATSAPP_TOKEN: ${APP_WHATSAPP_TOKEN:-}
+      APP_WHATSAPP_PHONE_NUMBER_ID: ${APP_WHATSAPP_PHONE_NUMBER_ID:-}
     volumes:
       - ./uploads:/data/uploads
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     depends_on:
       - db
 
@@ -37,7 +39,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - backend
 

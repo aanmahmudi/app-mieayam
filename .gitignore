@@ -10,4 +10,8 @@
 /backend/.env.*
 /frontend/.env
 /frontend/.env.*
+/docker-compose.override.yml
+/docker-compose.override.yaml
+/docker-compose.local.yml
+/docker-compose.local.yaml
 
