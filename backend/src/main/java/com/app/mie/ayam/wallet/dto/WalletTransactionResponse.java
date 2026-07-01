@@ -2,8 +2,8 @@ package com.app.mie.ayam.wallet.dto;
 
 import java.time.Instant;
 
-import com.app.mie.ayam.wallet.WalletTransaction;
-import com.app.mie.ayam.wallet.WalletTransactionType;
+import com.app.mie.ayam.wallet.entity.WalletTransaction;
+import com.app.mie.ayam.wallet.entity.WalletTransactionType;
 
 public record WalletTransactionResponse(
 	Long id,
@@ -26,4 +26,3 @@ public record WalletTransactionResponse(
 		);
 	}
 }
-

@@ -1,6 +1,6 @@
 package com.app.mie.ayam.ordering.dto;
 
-import com.app.mie.ayam.ordering.PaymentMethod;
+import com.app.mie.ayam.ordering.entity.PaymentMethod;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

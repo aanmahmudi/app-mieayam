@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.app.mie.ayam.AppMieAyamApplication;
-import com.app.mie.ayam.user.AppUser;
-import com.app.mie.ayam.user.AppUserRepository;
+import com.app.mie.ayam.user.entity.AppUser;
+import com.app.mie.ayam.user.repository.AppUserRepository;
 
 @Component
 public class AdminSeedApplication {

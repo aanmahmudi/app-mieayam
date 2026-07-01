@@ -1,7 +1,7 @@
 package com.app.mie.ayam.ordering.dto;
 
-import com.app.mie.ayam.menu.MenuCategory;
-import com.app.mie.ayam.ordering.AppOrderItem;
+import com.app.mie.ayam.menu.entity.MenuCategory;
+import com.app.mie.ayam.ordering.entity.AppOrderItem;
 
 public record OrderItemResponse(
 	Long menuItemId,
@@ -28,4 +28,3 @@ public record OrderItemResponse(
 		);
 	}
 }
-

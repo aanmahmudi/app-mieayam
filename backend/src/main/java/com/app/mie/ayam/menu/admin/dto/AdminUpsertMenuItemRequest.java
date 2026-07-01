@@ -1,6 +1,6 @@
 package com.app.mie.ayam.menu.admin.dto;
 
-import com.app.mie.ayam.menu.MenuCategory;
+import com.app.mie.ayam.menu.entity.MenuCategory;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,4 +14,3 @@ public record AdminUpsertMenuItemRequest(
 	String imageUrl
 ) {
 }
-

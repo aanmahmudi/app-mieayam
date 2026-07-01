@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import com.app.mie.ayam.ordering.AppOrderService;
+import com.app.mie.ayam.ordering.service.AppOrderService;
 
 @Service
 @ConditionalOnProperty(prefix = "app.kafka", name = "enabled", havingValue = "true")

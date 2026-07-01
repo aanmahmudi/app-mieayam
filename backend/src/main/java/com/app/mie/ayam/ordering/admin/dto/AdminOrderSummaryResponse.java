@@ -2,8 +2,8 @@ package com.app.mie.ayam.ordering.admin.dto;
 
 import java.time.Instant;
 
-import com.app.mie.ayam.ordering.OrderStatus;
-import com.app.mie.ayam.ordering.PaymentMethod;
+import com.app.mie.ayam.ordering.entity.OrderStatus;
+import com.app.mie.ayam.ordering.entity.PaymentMethod;
 
 public record AdminOrderSummaryResponse(
 	Long id,
@@ -16,4 +16,3 @@ public record AdminOrderSummaryResponse(
 	Instant paidAt
 ) {
 }
-

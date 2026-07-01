@@ -3,10 +3,10 @@ package com.app.mie.ayam.ordering.dto;
 import java.time.Instant;
 import java.util.List;
 
-import com.app.mie.ayam.ordering.AppOrderPayment;
-import com.app.mie.ayam.ordering.OrderStatus;
-import com.app.mie.ayam.ordering.PaymentMethod;
-import com.app.mie.ayam.ordering.AppOrder;
+import com.app.mie.ayam.ordering.entity.AppOrder;
+import com.app.mie.ayam.ordering.entity.AppOrderPayment;
+import com.app.mie.ayam.ordering.entity.OrderStatus;
+import com.app.mie.ayam.ordering.entity.PaymentMethod;
 
 public record OrderResponse(
 	Long id,

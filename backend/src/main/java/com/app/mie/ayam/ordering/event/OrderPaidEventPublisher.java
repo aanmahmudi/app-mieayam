@@ -27,14 +27,16 @@ public class OrderPaidEventPublisher {
 	}
 
 	public void publish(String username, OrderResponse receipt) {
+		int amountPaid = receipt.amountPaid() <= 0 ? receipt.total() : receipt.amountPaid();
+		int changeAmount = Math.max(0, receipt.changeAmount());
 		OrderPaidEvent event = new OrderPaidEvent(
 			receipt.id(),
 			username,
 			receipt.paymentMethod() == null ? null : receipt.paymentMethod().name(),
 			receipt.bank(),
 			receipt.total(),
-			receipt.amountPaid() == null ? receipt.total() : receipt.amountPaid(),
-			receipt.changeAmount() == null ? 0 : receipt.changeAmount(),
+			amountPaid,
+			changeAmount,
 			receipt.createdAt(),
 			receipt.paidAt(),
 			receipt.items() == null ? java.util.List.of() : receipt.items().stream()
