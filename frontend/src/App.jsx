@@ -42,6 +42,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [currentUsername, setCurrentUsername] = useState(() => localStorage.getItem(USERNAME_KEY) ?? '')
   const [bankChoice, setBankChoice] = useState('BRI')
+  const [receiptFromHistory, setReceiptFromHistory] = useState(false)
   const [adminMenuItems, setAdminMenuItems] = useState([])
   const [loadingAdminMenu, setLoadingAdminMenu] = useState(false)
   const [errorAdminMenu, setErrorAdminMenu] = useState('')
@@ -195,8 +196,12 @@ function App() {
     const message = err?.message ?? ''
     if (!message) return false
     if (!message.includes('Sesi habis')) return false
+    handleLogout()
+    setAuthRoute('login')
+    setRegisterStatus('')
+    setLoginStatus(message)
     return true
-  }, [])
+  }, [handleLogout])
 
   function goToLogin() {
     window.history.pushState(null, '', '/login')
@@ -393,6 +398,7 @@ function App() {
       } else {
         setOrderStatus('Pembayaran berhasil.')
       }
+      setReceiptFromHistory(false)
       setSheetMode('receipt')
       setCartOpen(true)
     } catch (err) {
@@ -545,7 +551,7 @@ function App() {
                 </button>
               ) : null}
               <button
-                className="iconButton"
+                className="iconButton historyBtn"
                 type="button"
                 onClick={() => {
                   setSheetMode('history')
@@ -554,6 +560,7 @@ function App() {
                 }}
                 disabled={loadingHistory}
                 aria-label="Riwayat"
+                title="Riwayat"
               >
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
@@ -651,6 +658,7 @@ function App() {
                   className="button primary"
                   type="button"
                   onClick={() => {
+                    setReceiptFromHistory(false)
                     setSheetMode('receipt')
                     setCartOpen(true)
                     scrollModalToTopSoon()
@@ -774,6 +782,7 @@ function App() {
                       <ReceiptSheet
                         token={token}
                         currentUsername={currentUsername}
+                        fromHistory={receiptFromHistory}
                         lastOrder={lastOrder}
                         paymentMethod={paymentMethod}
                         onDone={async () => {
@@ -793,7 +802,13 @@ function App() {
                         onClose={() => setCartOpen(false)}
                         onSelectOrder={(o) => {
                           setLastOrder(o)
-                          setSheetMode(o.status === 'PAID' ? 'receipt' : 'payment')
+                          if (o.status === 'PAID') {
+                            setReceiptFromHistory(true)
+                            setSheetMode('receipt')
+                            return
+                          }
+                          setReceiptFromHistory(false)
+                          setSheetMode('payment')
                         }}
                         onCancelOrder={cancelOrder}
                       />

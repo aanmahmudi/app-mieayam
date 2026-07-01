@@ -31,11 +31,11 @@ function saveContacts(username, email, whatsapp) {
   }
 }
 
-export function ReceiptSheet({ token, currentUsername, lastOrder, paymentMethod, onDone }) {
+export function ReceiptSheet({ token, currentUsername, fromHistory, lastOrder, paymentMethod, onDone }) {
   if (!lastOrder) return null
 
-  const [shareEmail, setShareEmail] = useState(() => readSavedContacts(currentUsername).email)
-  const [shareWhatsApp, setShareWhatsApp] = useState(() => readSavedContacts(currentUsername).whatsapp)
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareWhatsApp, setShareWhatsApp] = useState('')
   const [shareStatus, setShareStatus] = useState('')
   const [shareStatusError, setShareStatusError] = useState(false)
   const [shareSending, setShareSending] = useState(false)
@@ -43,12 +43,19 @@ export function ReceiptSheet({ token, currentUsername, lastOrder, paymentMethod,
   const whatsappTouchedRef = useRef(false)
 
   useEffect(() => {
-    const saved = readSavedContacts(currentUsername)
-    if (!emailTouchedRef.current) setShareEmail(saved.email)
-    if (!whatsappTouchedRef.current) setShareWhatsApp(saved.whatsapp)
+    emailTouchedRef.current = false
+    whatsappTouchedRef.current = false
+    if (fromHistory) {
+      const saved = readSavedContacts(currentUsername)
+      setShareEmail(saved.email)
+      setShareWhatsApp(saved.whatsapp)
+    } else {
+      setShareEmail('')
+      setShareWhatsApp('')
+    }
     setShareStatus('')
     setShareStatusError(false)
-  }, [currentUsername])
+  }, [currentUsername, lastOrder?.id, fromHistory])
 
   const receiptText = useMemo(() => {
     const createdAt = lastOrder?.createdAt ? formatDateTime(lastOrder.createdAt) : ''
@@ -76,8 +83,28 @@ export function ReceiptSheet({ token, currentUsername, lastOrder, paymentMethod,
     return lines.join('\n')
   }, [lastOrder, paymentMethod])
 
+  const groupedItems = useMemo(() => {
+    const items = Array.isArray(lastOrder?.items) ? lastOrder.items : []
+    const groups = [
+      { key: 'MAKANAN', label: 'Makanan' },
+      { key: 'MINUMAN', label: 'Minuman' },
+      { key: 'EXTRA', label: 'Extra' },
+    ]
+    return groups
+      .map((g) => ({
+        ...g,
+        items: items.filter((it) => String(it?.category ?? '') === g.key),
+      }))
+      .filter((g) => g.items.length)
+  }, [lastOrder])
+
   const handleDone = async () => {
     if (shareSending) return
+
+    if (fromHistory) {
+      await onDone()
+      return
+    }
 
     const email = (shareEmail ?? '').trim()
     const whatsapp = (shareWhatsApp ?? '').trim()
@@ -120,15 +147,30 @@ export function ReceiptSheet({ token, currentUsername, lastOrder, paymentMethod,
         <div className="receiptMeta">{formatDateTime(lastOrder.createdAt)}</div>
       </div>
       <div className="receiptItems">
-        {(lastOrder.items ?? []).map((it) => (
-          <div className="receiptItemRow" key={it.menuItemId}>
-            <div className="receiptItemName">{it.name}</div>
-            <div className="receiptItemQty">
-              {it.quantity} x {rupiah.format(it.priceEach)}
-            </div>
-            <div className="receiptItemSub">{rupiah.format(it.subtotal)}</div>
-          </div>
-        ))}
+        {groupedItems.length
+          ? groupedItems.flatMap((g) => [
+              <div className="receiptGroupTitle" key={`g-${g.key}`}>
+                {g.label}
+              </div>,
+              ...(g.items ?? []).map((it) => (
+                <div className="receiptItemRow" key={`${g.key}-${it.menuItemId ?? it.name}`}>
+                  <div className="receiptItemName">{it.name}</div>
+                  <div className="receiptItemQty">
+                    {it.quantity} x {rupiah.format(it.priceEach)}
+                  </div>
+                  <div className="receiptItemSub">{rupiah.format(it.subtotal)}</div>
+                </div>
+              )),
+            ])
+          : (lastOrder.items ?? []).map((it) => (
+              <div className="receiptItemRow" key={it.menuItemId}>
+                <div className="receiptItemName">{it.name}</div>
+                <div className="receiptItemQty">
+                  {it.quantity} x {rupiah.format(it.priceEach)}
+                </div>
+                <div className="receiptItemSub">{rupiah.format(it.subtotal)}</div>
+              </div>
+            ))}
       </div>
       <div className="receiptTotals">
         <div className="receiptTotalRow">
@@ -168,31 +210,39 @@ export function ReceiptSheet({ token, currentUsername, lastOrder, paymentMethod,
           </>
         ) : null}
       </div>
-      <div className="receiptShare">
-        <div className="receiptShareTitle">Kirim Otomatis Saat Selesai</div>
-        <input
-          className="input"
-          placeholder="Email tujuan (opsional)"
-          value={shareEmail}
-          onChange={(e) => {
-            emailTouchedRef.current = true
-            setShareEmail(e.target.value)
-          }}
-          disabled={shareSending}
-        />
-        <input
-          className="input"
-          placeholder="No WhatsApp (opsional, contoh: 62812xxxx)"
-          value={shareWhatsApp}
-          onChange={(e) => {
-            whatsappTouchedRef.current = true
-            setShareWhatsApp(e.target.value)
-          }}
-          disabled={shareSending}
-        />
-        <div className="receiptShareHint">Email dan nomor WhatsApp akan disimpan per akun. Email dikirim sebagai lampiran PDF. Untuk WhatsApp biasa, chat tetap dibuka otomatis karena tidak bisa auto-send file PDF tanpa WhatsApp Business API.</div>
-        {shareStatus ? <div className={`status ${shareStatusError ? 'error' : ''}`}>{shareStatus}</div> : null}
-      </div>
+      {fromHistory ? (
+        <div className="receiptShare">
+          <div className="receiptShareTitle">Kontak Tersimpan</div>
+          <input className="input" value={shareEmail} readOnly disabled />
+          <input className="input" value={shareWhatsApp} readOnly disabled />
+        </div>
+      ) : (
+        <div className="receiptShare">
+          <div className="receiptShareTitle">Kirim Otomatis Saat Selesai</div>
+          <input
+            className="input"
+            placeholder="Email tujuan (opsional)"
+            value={shareEmail}
+            onChange={(e) => {
+              emailTouchedRef.current = true
+              setShareEmail(e.target.value)
+            }}
+            disabled={shareSending}
+          />
+          <input
+            className="input"
+            placeholder="No WhatsApp (opsional, contoh: 62812xxxx)"
+            value={shareWhatsApp}
+            onChange={(e) => {
+              whatsappTouchedRef.current = true
+              setShareWhatsApp(e.target.value)
+            }}
+            disabled={shareSending}
+          />
+          <div className="receiptShareHint">Email dan nomor WhatsApp akan disimpan per akun. Email dikirim sebagai lampiran PDF. Untuk WhatsApp biasa, chat tetap dibuka otomatis karena tidak bisa auto-send file PDF tanpa WhatsApp Business API.</div>
+          {shareStatus ? <div className={`status ${shareStatusError ? 'error' : ''}`}>{shareStatus}</div> : null}
+        </div>
+      )}
       <button className="button primary receiptDone" type="button" onClick={handleDone} disabled={shareSending}>
         {shareSending ? 'Memproses...' : 'Selesai'}
       </button>

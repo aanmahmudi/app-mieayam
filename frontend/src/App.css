@@ -59,6 +59,22 @@
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
+.iconButton.historyBtn {
+  position: relative;
+}
+
+.iconButton.historyBtn::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+}
+
 .iconButton:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
@@ -833,6 +849,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.receiptGroupTitle {
+  margin-top: 2px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .receiptItemRow {

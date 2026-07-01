@@ -23,12 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.app.mie.ayam.menu.MenuCategory;
 import com.app.mie.ayam.menu.MenuItem;
 import com.app.mie.ayam.menu.MenuItemRepository;
 import com.app.mie.ayam.ordering.dto.CreateOrderItemRequest;
 import com.app.mie.ayam.ordering.dto.CreateOrderRequest;
 import com.app.mie.ayam.ordering.dto.OrderResponse;
 import com.app.mie.ayam.ordering.dto.PayOrderRequest;
+import com.app.mie.ayam.ordering.event.OrderPaidEventPublisher;
+import com.app.mie.ayam.ordering.event.ShareReceiptRequestedPublisher;
 import com.app.mie.ayam.user.AppUser;
 import com.app.mie.ayam.user.AppUserRepository;
 import com.app.mie.ayam.wallet.WalletService;
@@ -52,6 +55,8 @@ public class AppOrderService {
 	private final MenuItemRepository menuItemRepository;
 	private final WalletService walletService;
 	private final ObjectProvider<JavaMailSender> mailSenderProvider;
+	private final ObjectProvider<OrderPaidEventPublisher> orderPaidEventPublisherProvider;
+	private final ObjectProvider<ShareReceiptRequestedPublisher> shareReceiptRequestedPublisherProvider;
 	private final Environment environment;
 	private final RestClient restClient;
 
@@ -62,6 +67,8 @@ public class AppOrderService {
 		MenuItemRepository menuItemRepository,
 		WalletService walletService,
 		ObjectProvider<JavaMailSender> mailSenderProvider,
+		ObjectProvider<OrderPaidEventPublisher> orderPaidEventPublisherProvider,
+		ObjectProvider<ShareReceiptRequestedPublisher> shareReceiptRequestedPublisherProvider,
 		Environment environment
 	) {
 		this.orderRepository = orderRepository;
@@ -70,6 +77,8 @@ public class AppOrderService {
 		this.menuItemRepository = menuItemRepository;
 		this.walletService = walletService;
 		this.mailSenderProvider = mailSenderProvider;
+		this.orderPaidEventPublisherProvider = orderPaidEventPublisherProvider;
+		this.shareReceiptRequestedPublisherProvider = shareReceiptRequestedPublisherProvider;
 		this.environment = environment;
 		this.restClient = RestClient.builder().build();
 	}
@@ -163,7 +172,12 @@ public class AppOrderService {
 			payment.setBank(request.bank());
 		}
 		AppOrderPayment savedPayment = paymentRepository.save(payment);
-		return OrderResponse.from(order, savedPayment);
+		OrderResponse response = OrderResponse.from(order, savedPayment);
+		OrderPaidEventPublisher publisher = orderPaidEventPublisherProvider.getIfAvailable();
+		if (publisher != null) {
+			publisher.publish(username, response);
+		}
+		return response;
 	}
 
 	@Transactional
@@ -187,6 +201,22 @@ public class AppOrderService {
 
 	@Transactional(readOnly = true)
 	public AppOrderController.ShareReceiptResponse shareReceipt(String username, Long orderId, String email, String whatsapp) {
+		ShareReceiptRequestedPublisher publisher = shareReceiptRequestedPublisherProvider.getIfAvailable();
+		if (publisher != null) {
+			String e = email == null ? null : email.trim();
+			String w = whatsapp == null ? null : whatsapp.trim();
+			publisher.publish(username, orderId, e, w);
+			return new AppOrderController.ShareReceiptResponse(e != null && !e.isBlank(), w != null && !w.isBlank());
+		}
+
+		shareReceiptSync(username, orderId, email, whatsapp);
+		boolean emailSent = email != null && !email.isBlank();
+		boolean whatsappSent = whatsapp != null && !whatsapp.isBlank();
+		return new AppOrderController.ShareReceiptResponse(emailSent, whatsappSent);
+	}
+
+	@Transactional(readOnly = true)
+	public void shareReceiptSync(String username, Long orderId, String email, String whatsapp) {
 		AppOrder order = orderRepository.findByIdAndUserUsername(orderId, username)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order tidak ditemukan."));
 		AppOrderPayment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
@@ -195,19 +225,12 @@ public class AppOrderService {
 		String receiptText = buildReceiptText(receipt);
 		String subject = "Struk Pembayaran #" + receipt.id();
 
-		boolean emailSent = false;
-		boolean whatsappSent = false;
-
 		if (email != null && !email.isBlank()) {
 			sendReceiptEmail(email.trim(), subject, receipt);
-			emailSent = true;
 		}
 		if (whatsapp != null && !whatsapp.isBlank()) {
 			sendReceiptWhatsApp(whatsapp.trim(), receiptText);
-			whatsappSent = true;
 		}
-
-		return new AppOrderController.ShareReceiptResponse(emailSent, whatsappSent);
 	}
 
 	private String buildReceiptText(OrderResponse receipt) {
@@ -221,16 +244,22 @@ public class AppOrderService {
 		sb.append(receipt.createdAt()).append("\n\n");
 
 		sb.append("Rincian:\n");
-		for (var it : receipt.items()) {
-			sb.append("- ")
-				.append(it.name())
-				.append(" (")
-				.append(it.quantity())
-				.append(" x ")
-				.append(nf.format(it.priceEach()))
-				.append(") = ")
-				.append(nf.format(it.subtotal()))
-				.append("\n");
+		List<MenuCategory> categoryOrder = List.of(MenuCategory.MAKANAN, MenuCategory.MINUMAN, MenuCategory.EXTRA);
+		for (MenuCategory cat : categoryOrder) {
+			List<?> items = receipt.items() == null ? List.of() : receipt.items().stream().filter(it -> it.category() == cat).toList();
+			if (items.isEmpty()) continue;
+			sb.append("\n").append(categoryLabel(cat)).append(":\n");
+			for (var it : receipt.items().stream().filter(i -> i.category() == cat).toList()) {
+				sb.append("- ")
+					.append(it.name())
+					.append(" (")
+					.append(it.quantity())
+					.append(" x ")
+					.append(nf.format(it.priceEach()))
+					.append(") = ")
+					.append(nf.format(it.subtotal()))
+					.append("\n");
+			}
 		}
 		sb.append("\n");
 		sb.append("Total: ").append(nf.format(receipt.total())).append("\n");
@@ -290,8 +319,15 @@ public class AppOrderService {
 			nf.setMaximumFractionDigits(0);
 			nf.setMinimumFractionDigits(0);
 
+			List<MenuCategory> categoryOrder = List.of(MenuCategory.MAKANAN, MenuCategory.MINUMAN, MenuCategory.EXTRA);
 			int itemCount = receipt.items() == null ? 0 : receipt.items().size();
-			float height = 430f + (itemCount * 22f);
+			int groupCount = 0;
+			if (receipt.items() != null) {
+				for (MenuCategory cat : categoryOrder) {
+					if (receipt.items().stream().anyMatch(i -> i.category() == cat)) groupCount++;
+				}
+			}
+			float height = 430f + (itemCount * 22f) + (groupCount * 14f);
 			if (receipt.paymentMethod() == PaymentMethod.BANK && receipt.bank() != null && !receipt.bank().isBlank()) height += 16f;
 			if (receipt.status() == OrderStatus.PAID) height += 34f;
 			if (height < 560f) height = 560f;
@@ -331,35 +367,48 @@ public class AppOrderService {
 
 			PdfPTable items = new PdfPTable(new float[] { 1.6f, 0.9f, 0.9f });
 			items.setWidthPercentage(100f);
-			for (var it : receipt.items()) {
-				PdfPCell cName = new PdfPCell();
-				cName.setBorder(Rectangle.NO_BORDER);
-				cName.setPadding(0f);
-				Paragraph pName = new Paragraph(it.name() == null ? "-" : it.name(), itemNameFont);
-				pName.setSpacingAfter(2f);
-				cName.addElement(pName);
-				cName.addElement(new Paragraph(it.quantity() + " x " + nf.format(it.priceEach()), itemMetaFont));
-				items.addCell(cName);
+			Font groupFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10.5f);
+			for (MenuCategory cat : categoryOrder) {
+				List<?> filtered = receipt.items() == null ? List.of() : receipt.items().stream().filter(i -> i.category() == cat).toList();
+				if (filtered.isEmpty()) continue;
 
-				PdfPCell cQty = new PdfPCell(new Paragraph(String.valueOf(it.quantity()), labelFont));
-				cQty.setBorder(Rectangle.NO_BORDER);
-				cQty.setHorizontalAlignment(Element.ALIGN_RIGHT);
-				cQty.setVerticalAlignment(Element.ALIGN_TOP);
-				cQty.setPadding(0f);
-				items.addCell(cQty);
+				PdfPCell groupCell = new PdfPCell(new Paragraph(categoryLabel(cat), groupFont));
+				groupCell.setColspan(3);
+				groupCell.setBorder(Rectangle.NO_BORDER);
+				groupCell.setPadding(0f);
+				groupCell.setPaddingBottom(6f);
+				items.addCell(groupCell);
 
-				PdfPCell cSub = new PdfPCell(new Paragraph(nf.format(it.subtotal()), valueFont));
-				cSub.setBorder(Rectangle.NO_BORDER);
-				cSub.setHorizontalAlignment(Element.ALIGN_RIGHT);
-				cSub.setVerticalAlignment(Element.ALIGN_TOP);
-				cSub.setPadding(0f);
-				items.addCell(cSub);
+				for (var it : receipt.items().stream().filter(i -> i.category() == cat).toList()) {
+					PdfPCell cName = new PdfPCell();
+					cName.setBorder(Rectangle.NO_BORDER);
+					cName.setPadding(0f);
+					Paragraph pName = new Paragraph(it.name() == null ? "-" : it.name(), itemNameFont);
+					pName.setSpacingAfter(2f);
+					cName.addElement(pName);
+					cName.addElement(new Paragraph(it.quantity() + " x " + nf.format(it.priceEach()), itemMetaFont));
+					items.addCell(cName);
 
-				PdfPCell gap = new PdfPCell(new Paragraph(" ", itemMetaFont));
-				gap.setColspan(3);
-				gap.setBorder(Rectangle.NO_BORDER);
-				gap.setFixedHeight(8f);
-				items.addCell(gap);
+					PdfPCell cQty = new PdfPCell(new Paragraph(String.valueOf(it.quantity()), labelFont));
+					cQty.setBorder(Rectangle.NO_BORDER);
+					cQty.setHorizontalAlignment(Element.ALIGN_RIGHT);
+					cQty.setVerticalAlignment(Element.ALIGN_TOP);
+					cQty.setPadding(0f);
+					items.addCell(cQty);
+
+					PdfPCell cSub = new PdfPCell(new Paragraph(nf.format(it.subtotal()), valueFont));
+					cSub.setBorder(Rectangle.NO_BORDER);
+					cSub.setHorizontalAlignment(Element.ALIGN_RIGHT);
+					cSub.setVerticalAlignment(Element.ALIGN_TOP);
+					cSub.setPadding(0f);
+					items.addCell(cSub);
+
+					PdfPCell gap = new PdfPCell(new Paragraph(" ", itemMetaFont));
+					gap.setColspan(3);
+					gap.setBorder(Rectangle.NO_BORDER);
+					gap.setFixedHeight(8f);
+					items.addCell(gap);
+				}
 			}
 			document.add(items);
 
@@ -408,9 +457,21 @@ public class AppOrderService {
 		table.addCell(gap);
 	}
 
+	private static String categoryLabel(MenuCategory category) {
+		if (category == null) return "Lainnya";
+		return switch (category) {
+			case MAKANAN -> "Makanan";
+			case MINUMAN -> "Minuman";
+			case EXTRA -> "Extra";
+		};
+	}
+
 	private void sendReceiptWhatsApp(String rawNumber, String text) {
 		String token = envFirstNonBlank("APP_WHATSAPP_TOKEN");
 		String phoneNumberId = envFirstNonBlank("APP_WHATSAPP_PHONE_NUMBER_ID");
+		String templateName = envFirstNonBlank("APP_WHATSAPP_TEMPLATE_NAME");
+		String templateLang = envFirstNonBlank("APP_WHATSAPP_TEMPLATE_LANG", "APP_WHATSAPP_TEMPLATE_LANGUAGE");
+		if (templateLang == null || templateLang.isBlank()) templateLang = "en_US";
 		if (token == null || token.isBlank() || phoneNumberId == null || phoneNumberId.isBlank()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "WhatsApp belum dikonfigurasi (APP_WHATSAPP_TOKEN, APP_WHATSAPP_PHONE_NUMBER_ID).");
 		}
@@ -421,12 +482,25 @@ public class AppOrderService {
 		}
 
 		String url = "https://graph.facebook.com/v20.0/" + phoneNumberId + "/messages";
-		Map<String, Object> payload = Map.of(
-			"messaging_product", "whatsapp",
-			"to", to,
-			"type", "text",
-			"text", Map.of("body", text)
-		);
+		Map<String, Object> payload;
+		if (templateName != null && !templateName.isBlank()) {
+			payload = Map.of(
+				"messaging_product", "whatsapp",
+				"to", to,
+				"type", "template",
+				"template", Map.of(
+					"name", templateName,
+					"language", Map.of("code", templateLang)
+				)
+			);
+		} else {
+			payload = Map.of(
+				"messaging_product", "whatsapp",
+				"to", to,
+				"type", "text",
+				"text", Map.of("body", text)
+			);
+		}
 		try {
 			restClient.post()
 				.uri(url)
